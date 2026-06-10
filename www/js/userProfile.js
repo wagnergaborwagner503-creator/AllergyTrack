@@ -224,7 +224,7 @@ App.UserProfile = {
       <button class="btn btn-ghost" id="auth-skip-btn" style="width:100%;font-size:12px;opacity:.6">
         Bejelentkezés nélkül folytatom
       </button>
-    `);
+    `, { backdropClose: false });  /* háttérre kattintás ne zárja be */
 
     /* Középre igazított, teljes képernyős megjelenés (nem bottom-sheet) */
     document.getElementById('modal-overlay')?.classList.add('auth-mode');

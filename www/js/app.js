@@ -166,15 +166,19 @@ App.toast = function (message, type = 'info', duration = 3000) {
 };
 
 /* ── Modal ──────────────────────────────────── */
-App.showModal = function (html) {
+App.showModal = function (html, opts = {}) {
   const overlay = document.getElementById('modal-overlay');
   const content = document.getElementById('modal-content');
   if (!overlay || !content) return;
   content.innerHTML = html;
   overlay.style.display = 'flex';
-  overlay.addEventListener('click', function handler(e) {
-    if (e.target === overlay) { App.closeModal(); overlay.removeEventListener('click', handler); }
-  });
+  /* backdropClose: false esetén a háttérre kattintás nem zárja be a modalt */
+  const closeOnBackdrop = opts.backdropClose !== false;
+  if (closeOnBackdrop) {
+    overlay.addEventListener('click', function handler(e) {
+      if (e.target === overlay) { App.closeModal(); overlay.removeEventListener('click', handler); }
+    });
+  }
 };
 
 App.closeModal = function () {
