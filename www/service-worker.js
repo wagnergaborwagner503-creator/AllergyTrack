@@ -89,15 +89,17 @@ self.addEventListener('fetch', event => {
   if (url.origin === self.location.origin) {
     event.respondWith(
       caches.match(request).then(cached => {
-        const networkFetch = fetch(request).then(resp => {
-          if (resp.ok) {
-            const clone = resp.clone();
-            caches.open(CACHE).then(c => c.put(request, clone));
-          }
-          return resp;
-        });
+        const networkFetch = fetch(request)
+          .then(resp => {
+            if (resp.ok) {
+              const clone = resp.clone();
+              caches.open(CACHE).then(c => c.put(request, clone));
+            }
+            return resp;
+          })
+          .catch(() => cached ?? new Response('Offline', { status: 503 }));
         return cached ?? networkFetch;
-      })
+      }).catch(() => new Response('Offline', { status: 503 }))
     );
   }
 });
