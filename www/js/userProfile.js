@@ -221,10 +221,16 @@ App.UserProfile = {
       <button class="btn btn-ghost" id="auth-switch-btn" style="width:100%;margin-bottom:6px">
         ${isLogin ? '➕ Új fiók létrehozása' : '← Bejelentkezés meglévő fiókba'}
       </button>
-      <button class="btn btn-ghost" onclick="App.closeModal()" style="width:100%;font-size:12px;opacity:.6">
+      <button class="btn btn-ghost" id="auth-skip-btn" style="width:100%;font-size:12px;opacity:.6">
         Bejelentkezés nélkül folytatom
       </button>
     `);
+
+    /* "Bejelentkezés nélkül" → megjegyzi hogy látta már az auth panelt */
+    document.getElementById('auth-skip-btn')?.addEventListener('click', () => {
+      localStorage.setItem('allergytrack_seen_auth', '1');
+      App.closeModal();
+    });
 
     /* Váltás login ↔ register */
     document.getElementById('auth-switch-btn')?.addEventListener('click', () => {

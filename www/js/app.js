@@ -287,12 +287,27 @@ App.init = async function () {
       });
     });
 
+    /* Supabase + Auth inicializáció – MIELŐTT navigálunk, hogy session-t visszaállítsuk */
+    let _initialUser = null;
+    if (App.Supabase) {
+      App.Supabase.init();
+      if (App.Supabase.isConfigured && App.Auth) {
+        try { _initialUser = await App.Auth.init(); } catch (e) {}
+      }
+    }
+    App._updateProfileButton();
+
     /* PWA shortcut / deep-link kezelés (?page=xxx) */
     const urlPage = new URLSearchParams(window.location.search).get('page');
     const startPage = (urlPage && App._pageTitle[urlPage]) ? urlPage : 'dashboard';
 
     /* Navigate to dashboard (vagy deep-link oldal) */
     await App.navigate(startPage);
+
+    /* Ha be van jelentkezve – profil betöltése a háttérben */
+    if (_initialUser && App.UserProfile) {
+      App.UserProfile.load().catch(() => {});
+    }
 
     /* Patch notes – első indítás után az új verzióban */
     if (App.PatchNotes) {
@@ -331,18 +346,23 @@ App.init = async function () {
       App.Notifications.init().catch(() => {});
     }
 
-    /* Supabase + Auth inicializáció (nem blokkolja az indulást) */
-    if (App.Supabase) {
-      App.Supabase.init();
-      if (App.Supabase.isConfigured && App.Auth) {
-        App.Auth.init()
-          .then(user => {
-            if (user && App.UserProfile) {
-              App.UserProfile.load().catch(() => {});
-            }
-            App._updateProfileButton();
-          })
-          .catch(() => {});
+    /* ── Első bejelentkezési képernyő ───────────
+       Ha Supabase konfigurálva van, de nincs aktív session,
+       és a felhasználó még nem találkozott az auth panellel:
+       mutassuk a belépési képernyőt az első indításkor.
+       Ha korábban be volt jelentkezve → a session visszaáll, panel nem jelenik meg.
+       Ha már látta és "skip"-elte → localStorage flag megakadályozza az újra-mutatást.
+    ─────────────────────────────────────────── */
+    if (App.Supabase?.isConfigured && !App.Auth?.isLoggedIn) {
+      const seenAuth = localStorage.getItem('allergytrack_seen_auth');
+      if (!seenAuth) {
+        setTimeout(() => {
+          /* Csak akkor mutatjuk, ha nincs más modal nyitva (pl. patch notes) */
+          const overlay = document.getElementById('modal-overlay');
+          if (!overlay || overlay.style.display === 'none' || overlay.style.display === '') {
+            App.UserProfile?._showAuthPanel?.('login');
+          }
+        }, 500);
       }
     }
 
