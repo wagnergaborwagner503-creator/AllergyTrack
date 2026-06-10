@@ -226,6 +226,9 @@ App.UserProfile = {
       </button>
     `);
 
+    /* Középre igazított, teljes képernyős megjelenés (nem bottom-sheet) */
+    document.getElementById('modal-overlay')?.classList.add('auth-mode');
+
     /* "Bejelentkezés nélkül" → megjegyzi hogy látta már az auth panelt */
     document.getElementById('auth-skip-btn')?.addEventListener('click', () => {
       localStorage.setItem('allergytrack_seen_auth', '1');

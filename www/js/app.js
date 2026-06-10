@@ -179,7 +179,10 @@ App.showModal = function (html) {
 
 App.closeModal = function () {
   const overlay = document.getElementById('modal-overlay');
-  if (overlay) overlay.style.display = 'none';
+  if (overlay) {
+    overlay.style.display = 'none';
+    overlay.classList.remove('auth-mode'); /* auth-panel cleanup */
+  }
 };
 
 App.showConfirmModal = function (title, message, onConfirm) {

@@ -735,6 +735,32 @@ input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
   padding-right: var(--sp-5);
 }
 
+/* ── Auth-panel – teljes képernyős, középre igazított ──
+   .auth-mode osztály kerül az overlay-re, felülírja a bottom-sheet stílust */
+#modal-overlay.auth-mode {
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .82);
+  backdrop-filter: blur(14px) saturate(.35);
+  -webkit-backdrop-filter: blur(14px) saturate(.35);
+}
+#modal-overlay.auth-mode #modal-content {
+  border-radius: 20px;
+  max-width: 420px;
+  width: calc(100% - 40px);
+  max-height: 92dvh;
+  max-height: 92vh; /* fallback */
+  padding-bottom: var(--sp-5);
+  animation: authPanelIn .32s cubic-bezier(.34, 1.46, .64, 1);
+}
+#modal-overlay.auth-mode .modal-handle {
+  display: none; /* nincs drag-handle, ez nem bottom sheet */
+}
+@keyframes authPanelIn {
+  from { transform: scale(.88); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
 /* ── Loading ────────────────────────────────── */
 #loading-screen {
   position: fixed; inset: 0; z-index: 999;
