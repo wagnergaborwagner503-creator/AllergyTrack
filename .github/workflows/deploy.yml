@@ -1,9 +1,7 @@
 name: Deploy AllergyTrack PWA
 
 on:
-  push:
-    branches: [master]
-  workflow_dispatch:
+  workflow_dispatch:  # csak kézi indításra fut – te döntöd el mikor megy ki
 
 permissions:
   contents: read
