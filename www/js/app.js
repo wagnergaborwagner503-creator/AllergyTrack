@@ -402,6 +402,9 @@ App._onAuthChange = function (event, user) {
     App.UserProfile.load().catch(() => {});
   }
   App._updateProfileButton();
+  /* Login/logout után az aktuális oldal újratöltése – adatokat megmutatja/elrejti */
+  const page = App._currentPage || 'dashboard';
+  App.navigate(page).catch(() => {});
 };
 
 /** Profil gomb frissítése: monogram ha be van jelentkezve, ikon ha nem */

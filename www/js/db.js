@@ -75,10 +75,23 @@ App.db = (function () {
     });
   }
 
+  /* ── Adathozzáférés-ellenőrzés ───────────────
+     Ha Supabase konfigurálva van, de nincs bejelentkezett felhasználó,
+     a személyes adatok nem olvashatók / írhatók.
+     Offline módban (Supabase nincs konfigurálva) minden elérhető. */
+  function _canRead() {
+    try {
+      if (!window.App?.Supabase?.isConfigured) return true; // offline mód
+      return !!window.App?.Auth?.isLoggedIn;
+    } catch (e) { return true; }
+  }
+  function _canWrite() { return _canRead(); }
+
   /* ══════════════════════════════════════════
      SYMPTOMS LOG
   ══════════════════════════════════════════ */
   async function saveSymptomsLog(entry) {
+    if (!_canWrite()) return null;
     await open();
     const store = tx('symptoms_log', 'readwrite');
     const record = {
@@ -94,6 +107,7 @@ App.db = (function () {
   }
 
   async function getSymptomsLogs(dateFrom, dateTo) {
+    if (!_canRead()) return [];
     await open();
     const store = tx('symptoms_log');
     const idx   = store.index('date');
@@ -103,16 +117,19 @@ App.db = (function () {
   }
 
   async function getRecentLogs(limit = 10) {
+    if (!_canRead()) return [];
     const all = await getAll('symptoms_log');
     return all.sort((a, b) => b.date.localeCompare(a.date)).slice(0, limit);
   }
 
   async function getSymptomsLogById(id) {
+    if (!_canRead()) return null;
     await open();
     return promisify(tx('symptoms_log').get(id));
   }
 
   async function deleteSymptomsLog(id) {
+    if (!_canWrite()) return null;
     await open();
     return promisify(tx('symptoms_log', 'readwrite').delete(id));
   }
@@ -303,15 +320,18 @@ App.db = (function () {
      ALLERGEN PROFILE
   ══════════════════════════════════════════ */
   async function saveAllergenProfile(entry) {
+    if (!_canWrite()) return null;
     await open();
     return promisify(tx('allergen_profile', 'readwrite').put(entry));
   }
 
   async function getAllergenProfile() {
+    if (!_canRead()) return [];
     return getAll('allergen_profile');
   }
 
   async function deleteAllergenProfile(allergenId) {
+    if (!_canWrite()) return null;
     await open();
     return promisify(tx('allergen_profile', 'readwrite').delete(allergenId));
   }
@@ -339,6 +359,7 @@ App.db = (function () {
      MEDICATIONS
   ══════════════════════════════════════════ */
   async function getMedications() {
+    if (!_canRead()) return [];
     const stored = await getAll('medications');
     const storedNames = stored.map(m => m.name);
     /* Merge defaults */
@@ -349,6 +370,7 @@ App.db = (function () {
   }
 
   async function saveMedication(med) {
+    if (!_canWrite()) return null;
     await open();
     const store = tx('medications', 'readwrite');
     if (med.id) return promisify(store.put(med));
@@ -357,6 +379,7 @@ App.db = (function () {
   }
 
   async function deleteMedication(id) {
+    if (!_canWrite()) return null;
     await open();
     return promisify(tx('medications', 'readwrite').delete(id));
   }
@@ -365,6 +388,7 @@ App.db = (function () {
      ANALYTICS HELPERS
   ══════════════════════════════════════════ */
   async function getSymptomFrequency(days = 30) {
+    if (!_canRead()) return {};
     const from = new Date();
     from.setDate(from.getDate() - days);
     const logs  = await getSymptomsLogs(from.toISOString().split('T')[0]);
@@ -378,6 +402,7 @@ App.db = (function () {
   }
 
   async function getDailySeverity(days = 30) {
+    if (!_canRead()) return {};
     const from = new Date();
     from.setDate(from.getDate() - days);
     const logs = await getSymptomsLogs(from.toISOString().split('T')[0]);
