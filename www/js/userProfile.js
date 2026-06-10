@@ -24,9 +24,11 @@ App.UserProfile = {
       /* PGRST116 = sor nem létezik – még nincs profil (nem hiba) */
       if (error && error.code !== 'PGRST116') throw error;
       this._data = data ?? null;
+      App._setSyncState?.('ok');
       return this._data;
     } catch (e) {
       console.warn('[UserProfile] load hiba:', e);
+      App._setSyncState?.('error');
       return null;
     }
   },
@@ -47,6 +49,51 @@ App.UserProfile = {
   },
 
   get avatarUrl() { return this._data?.avatar_url ?? null; },
+
+  /* ── Profilkép feltöltése galériából ────────
+     Base64-be konvertál, tárolja lokálisan + Supabase-ben */
+  async pickAvatar() {
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type   = 'file';
+      input.accept = 'image/*';
+      input.style.display = 'none';
+      document.body.appendChild(input);
+      input.addEventListener('change', async () => {
+        const file = input.files?.[0];
+        document.body.removeChild(input);
+        if (!file) { resolve(null); return; }
+        try {
+          const base64 = await new Promise((res, rej) => {
+            const reader = new FileReader();
+            reader.onload  = () => res(reader.result);
+            reader.onerror = rej;
+            /* Max 400×400 képbe tömörítve – Canvas segítségével */
+            const img = new Image();
+            img.onload = () => {
+              const MAX = 400;
+              const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+              const canvas = document.createElement('canvas');
+              canvas.width  = Math.round(img.width  * scale);
+              canvas.height = Math.round(img.height * scale);
+              canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+              res(canvas.toDataURL('image/jpeg', 0.82));
+            };
+            img.onerror = rej;
+            img.src = URL.createObjectURL(file);
+          });
+          await this.save({ avatar_url: base64 });
+          App._updateProfileButton?.();
+          App.toast('✅ Profilkép frissítve!', 'success');
+          resolve(base64);
+        } catch (e) {
+          App.toast('Hiba a kép feltöltésekor: ' + e.message, 'error');
+          resolve(null);
+        }
+      });
+      input.click();
+    });
+  },
 
   /* ── Mentés Supabase-be ───────────────────── */
   async save(updates) {
@@ -349,7 +396,10 @@ App.UserProfile = {
             <span style="font-size:11px;color:var(--text-3)">Bejelentkezve · szinkronizálás aktív</span>
           </div>
         </div>
-        <button class="btn btn-ghost" id="prof-edit-name-btn" style="padding:6px 10px;font-size:12px;white-space:nowrap">✏️ Szerk.</button>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="btn btn-ghost" id="prof-edit-name-btn" style="padding:6px 10px;font-size:12px;white-space:nowrap">✏️ Szerk.</button>
+          <button class="btn btn-ghost" id="prof-avatar-btn" style="padding:6px 10px;font-size:12px;white-space:nowrap">📷 Kép</button>
+        </div>
       </div>
 
       <!-- Gyorslinkek -->
@@ -394,6 +444,10 @@ App.UserProfile = {
     `);
 
     document.getElementById('prof-edit-name-btn')?.addEventListener('click', () => this._showEditName());
+    document.getElementById('prof-avatar-btn')?.addEventListener('click', () => {
+      App.closeModal();
+      this.pickAvatar().then(() => setTimeout(() => this._showProfilePanel(), 300));
+    });
     document.getElementById('prof-sync-up-btn')?.addEventListener('click', async () => {
       App.closeModal();
       await this.syncAllergenProfileUp();

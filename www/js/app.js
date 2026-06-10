@@ -400,6 +400,10 @@ App.init = async function () {
 App._onAuthChange = function (event, user) {
   if (user && App.UserProfile) {
     App.UserProfile.load().catch(() => {});
+    /* Belépéskor automatikus pollen + időjárás szinkron */
+    if (event === 'SIGNED_IN') {
+      App._syncOnLogin();
+    }
   }
   App._updateProfileButton();
   /* Login/logout után az aktuális oldal újratöltése – adatokat megmutatja/elrejti */
@@ -407,7 +411,27 @@ App._onAuthChange = function (event, user) {
   App.navigate(page).catch(() => {});
 };
 
-/** Profil gomb frissítése: monogram ha be van jelentkezve, ikon ha nem */
+/** Belépéskor automatikusan szinkronizálja a pollen + időjárás adatokat */
+App._syncOnLogin = async function () {
+  App._setSyncState('pending');
+  try {
+    const fetches = [];
+    if (App.PollenFetcher) fetches.push(App.PollenFetcher.fetchAll().catch(() => {}));
+    if (App.Weather)       fetches.push(App.Weather.fetchForCurrentLocation(true).catch(() => {}));
+    await Promise.all(fetches);
+    App._setSyncState('ok');
+    /* Szinkron után dashboard frissítése ha azon vagyunk */
+    if (App._currentPage === 'dashboard') App.navigate('dashboard').catch(() => {});
+  } catch (e) {
+    App._setSyncState('error');
+  }
+  /* 5 mp után visszaáll 'ok'-ra ha sikerült */
+  setTimeout(() => {
+    if (App.Auth?.isLoggedIn) App._setSyncState('ok');
+  }, 5000);
+};
+
+/** Profil gomb frissítése: monogram/avatar ha be van jelentkezve, ikon ha nem */
 App._updateProfileButton = function () {
   const btn = document.getElementById('profile-btn');
   if (!btn) return;
@@ -416,9 +440,15 @@ App._updateProfileButton = function () {
   btn.classList.toggle('logged-in', loggedIn);
 
   if (loggedIn) {
-    const init = App.UserProfile?.initials ?? '?';
-    btn.innerHTML = `<span style="pointer-events:none">${init}</span>`;
+    const avatar = App.UserProfile?.avatarUrl;
+    if (avatar) {
+      btn.innerHTML = `<img src="${avatar}" alt="Profil" style="width:34px;height:34px;object-fit:cover;border-radius:50%">`;
+    } else {
+      const init = App.UserProfile?.initials ?? '?';
+      btn.innerHTML = `<span style="pointer-events:none">${init}</span>`;
+    }
   } else {
+    btn.classList.remove('sync-ok', 'sync-pending', 'sync-error');
     btn.innerHTML = `
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
            stroke-linecap="round" width="16" height="16" style="pointer-events:none">
@@ -428,13 +458,23 @@ App._updateProfileButton = function () {
   }
 };
 
+/** Szinkron állapot frissítése a profil gombon */
+App._setSyncState = function (state) {
+  const btn = document.getElementById('profile-btn');
+  if (!btn || !App.Auth?.isLoggedIn) return;
+  btn.classList.remove('sync-ok', 'sync-pending', 'sync-error');
+  if (state) btn.classList.add(`sync-${state}`);
+};
+
 /* ── Header location display ────────────────── */
 App._updateHeaderLocation = function (loc) {
-  if (!loc?.nearestCity) return;
+  if (!loc?.nearestCity && !loc?.userCity) return;
   const el  = document.getElementById('header-location');
   const txt = document.getElementById('header-location-text');
   if (el && txt) {
-    txt.textContent = loc.nearestCity;
+    const display = loc.userCity || loc.nearestCity;
+    const station = (loc.userCity && loc.userCity !== loc.nearestCity) ? ` (${loc.nearestCity})` : '';
+    txt.textContent = display + station;
     el.style.display = 'flex';
   }
 };

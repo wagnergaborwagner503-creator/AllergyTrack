@@ -131,7 +131,9 @@ App.Dashboard = {
       <!-- Allergen risk alerts: minden high+ szintű allergen -->
       ${allergenAlerts.length > 0 ? `
       <div class="section-header mb-2">
-        <div class="section-title">Allergen veszélyek${userCity ? ` · 📍${userLocation.nearestCity}` : ' · 🇭🇺 Magyarország'}</div>
+        <div class="section-title">Allergen veszélyek${userCity
+            ? ` · 📍${userLocation.userCity || userLocation.nearestCity}${(userLocation.userCity && userLocation.userCity !== userLocation.nearestCity) ? ` (${userLocation.nearestCity} állomás)` : ''}`
+            : ' · 🇭🇺 Magyarország'}</div>
         <div class="section-action" data-nav="pollen">Részletek →</div>
       </div>
       <div class="card mb-4" style="padding:12px 16px">
@@ -238,7 +240,7 @@ App.Dashboard = {
       });
     });
 
-    const futureDates = Object.keys(byDate).sort().slice(0, 5);
+    const futureDates = Object.keys(byDate).sort().slice(0, 3);
     if (futureDates.length === 0) return '';
 
     const today = App.DATA.todayISO();
@@ -263,13 +265,13 @@ App.Dashboard = {
 
     if (notable.length === 0) return '';
 
-    /* Day labels */
+    /* Day labels – nap neve + dátum */
     const dayLabel = (iso) => {
       const diff = Math.round((new Date(iso) - new Date(today)) / 86400000);
-      if (diff === 1) return 'Holnap';
-      if (diff === 2) return '+2 nap';
-      const d = new Date(iso);
-      return `${App.DATA.MONTHS_SHORT?.[d.getMonth()] || (d.getMonth()+1)+'.'}  ${d.getDate()}.`;
+      const d    = new Date(iso);
+      const name = App.DATA.DAYS_LONG[(d.getDay() + 6) % 7];
+      if (diff === 1) return `Holnap · ${name}`;
+      return `${name} · ${d.getMonth() + 1}.${d.getDate()}.`;
     };
 
     /* Trend arrow vs PREVIOUS DAY (not vs today for all columns)
@@ -566,12 +568,12 @@ App.Dashboard = {
     const el = document.getElementById('weather-forecast-rows');
     if (!el || !wx.days?.length) return;
     const today = App.DATA.todayISO();
-    const days  = wx.days.filter(d => d.date > today).slice(0, 5);
+    const days  = wx.days.filter(d => d.date > today).slice(0, 3);
     if (!days.length) { el.innerHTML = ''; return; }
     el.innerHTML = days.map((d, i) => {
-      const diff = i + 1;
-      const label = diff === 1 ? 'Holnap' : diff === 2 ? 'Holnapután'
-        : App.DATA.formatDateShort(d.date);
+      const dt    = new Date(d.date);
+      const name  = App.DATA.DAYS_LONG[(dt.getDay() + 6) % 7];
+      const label = i === 0 ? `Holnap · ${name}` : name;
       const washTxt = d.pollenWashFactor < 0.6
         ? '<span style="color:var(--info);font-size:10px"> 🌧 pollen↓</span>' : '';
       return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border-2)">

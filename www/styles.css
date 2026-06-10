@@ -1521,29 +1521,56 @@ canvas { max-width: 100%; }
   align-items: center;
   justify-content: center;
   transition: transform var(--t-fast), box-shadow var(--t-fast), background var(--t-fast);
-  overflow: hidden;
+  overflow: visible;        /* ne vágja le a státusz-pontot */
   position: relative;
   flex-shrink: 0;
   padding: 0;
   letter-spacing: -.3px;
 }
+/* Belső kör vágása (avatar kép miatt) */
+.profile-btn > * { pointer-events: none; }
+.profile-btn img {
+  width: 34px; height: 34px;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
 .profile-btn:hover  { background: var(--accent-light); box-shadow: 0 0 0 3px var(--accent-ring); }
 .profile-btn:active { transform: scale(0.88); }
-.profile-btn img    { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 
-/* Zöld online jelző (ha be van jelentkezve) */
+/* ── Státusz-pont (szinkron jelző) ──────────────
+   overflow:visible miatt ez kilóg a kör aljából,
+   így mindig látható a fejléc háttere előtt. */
 .profile-btn.logged-in::after {
   content: '';
   position: absolute;
-  bottom: 0px; right: 0px;
-  width: 9px; height: 9px;
-  background: #69F0AE;
+  bottom: -2px; right: -2px;
+  width: 10px; height: 10px;
   border-radius: 50%;
-  border: 2px solid var(--card);
+  border: 2px solid var(--header-bg, #2E7D32);
+  z-index: 10;
+  background: #9E9E9E;   /* alapértelmezett: szürke (offline) */
+}
+/* Zöld – szinkronizált */
+.profile-btn.sync-ok::after    { background: #4CAF50; }
+/* Sárga – szinkronizálás folyamatban */
+.profile-btn.sync-pending::after {
+  background: #FFC107;
+  animation: syncPulse .9s ease-in-out infinite;
+}
+/* Szürke – offline / nem tud szinkronizálni */
+.profile-btn.sync-error::after { background: #9E9E9E; }
+
+@keyframes syncPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: .5; transform: scale(.8); }
 }
 
 [data-theme="dark"] .profile-btn {
   border-color: rgba(255, 255, 255, 0.15);
+}
+[data-theme="dark"] .profile-btn.logged-in::after {
+  border-color: var(--app-header-dark, #1B5E20);
 }
 
 /* ── Nagy avatár (profil panelben) ─────────── */

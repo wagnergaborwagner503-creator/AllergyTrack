@@ -89,16 +89,32 @@ App.GeoLocation = {
     });
   },
 
+  /* Nominatim reverse geocode – user tényleges városát adja vissza */
+  async _reverseGeocode(lat, lon) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10&accept-language=hu`;
+      const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      if (!r.ok) return null;
+      const d = await r.json();
+      return d.address?.city || d.address?.town || d.address?.village || d.address?.municipality || null;
+    } catch (e) {
+      return null;
+    }
+  },
+
   async _saveAndReturn(lat, lon) {
     const { city, distanceKm } = this._nearestCity(lat, lon);
+    /* Reverse geocode – nem blokkolja a mentést, párhuzamosan fut */
+    const userCityName = await this._reverseGeocode(lat, lon).catch(() => null);
     const locationData = {
       lat, lon,
-      nearestCity: city?.name || null,
+      userCity:    userCityName || city?.name || null,  /* tényleges város (Nominatim) */
+      nearestCity: city?.name || null,                  /* legközelebbi pollen mérőállomás */
       distanceKm,
       timestamp: new Date().toISOString(),
     };
     await App.db.setSetting('userLocation', locationData);
-    console.log(`[GeoLocation] Pozíció: ${lat.toFixed(4)}, ${lon.toFixed(4)} → legközelebb: ${city?.name} (${distanceKm} km)`);
+    console.log(`[GeoLocation] ${userCityName || city?.name} → állomás: ${city?.name} (${distanceKm} km)`);
     return locationData;
   },
 
