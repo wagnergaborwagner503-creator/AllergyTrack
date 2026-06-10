@@ -15,7 +15,7 @@ App.Supabase = {
 
   /* ─── KONFIGURÁCIÓ – cseréld ki a saját értékeidre ─── */
   URL:      'https://mwutxdzkzdqgfvchstg.supabase.co',
-  ANON_KEY: 'sb_publishable_MclRezKsuMjLAqUoWIUPgA_6OCIBzrj',
+  ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dXR4ZHpja3pkcWdmdmNoc3RnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwOTAzODYsImV4cCI6MjA5NjY2NjM4Nn0.KeyWFjwOeUBu8lOs4pUWu2fqvNRFnmxCmKhkuZpwFfU',
   /* ─────────────────────────────────────────────────── */
 
   _client: null,
