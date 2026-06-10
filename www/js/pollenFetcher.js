@@ -396,6 +396,60 @@ App.PollenFetcher = {
     return null;
   },
 
+  /* ── Supabase megosztott pollenadatok: feltöltés ─────────────────────────
+     Ha be van jelentkezve a felhasználó, az éppen mentett pollenadatokat
+     feltölti a shared_pollen_data táblába – így minden user látja.          */
+  async pushToSupabase(entries) {
+    const sb = App.Supabase?.get?.();
+    if (!sb || !App.Auth?.isLoggedIn) return;
+    if (!entries?.length) return;
+
+    try {
+      const rows = entries.map(e => ({
+        date:          e.date,
+        location:      e.location,
+        allergen_id:   e.allergen_id,
+        concentration: e.concentration ?? null,
+        unit:          e.unit ?? null,
+        risk_level:    e.risk_level,
+      }));
+
+      const { error } = await sb
+        .from('shared_pollen_data')
+        .upsert(rows, { onConflict: 'date,location,allergen_id' });
+
+      if (error) throw error;
+      console.log(`[PollenSync] ${rows.length} sor feltöltve a shared_pollen_data táblába.`);
+    } catch (e) {
+      console.warn('[PollenSync] pushToSupabase hiba:', e);
+    }
+  },
+
+  /* ── Supabase megosztott pollenadatok: letöltés ─────────────────────────
+     Bejelentkezéskor (vagy manuálisan) letölti a legfrissebb megosztott
+     pollenadatokat és elmenti IndexedDB-be.                                 */
+  async pullFromSupabase() {
+    const sb = App.Supabase?.get?.();
+    if (!sb) return;
+
+    try {
+      const { data, error } = await sb
+        .from('shared_pollen_data')
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(3000);
+
+      if (error) throw error;
+      if (!data?.length) return;
+
+      await App.db.savePollenData(data);
+      console.log(`[PollenSync] ${data.length} megosztott pollenadatat letöltve.`);
+      return data;
+    } catch (e) {
+      console.warn('[PollenSync] pullFromSupabase hiba:', e);
+    }
+  },
+
   /* Map a Hungarian plant name to an allergen_id */
   _mapName(name) {
     if (this.NAME_MAP[name]) return this.NAME_MAP[name];

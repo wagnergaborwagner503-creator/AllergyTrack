@@ -399,12 +399,16 @@ App.init = async function () {
 /* ── Auth callbacks ─────────────────────────── */
 App._onAuthChange = function (event, user) {
   if (user && App.UserProfile) {
-    App.UserProfile.load().catch(() => {});
+    /* load() után frissítjük a gombot (avatar csak akkor jön meg, ha a profil betöltött) */
+    App.UserProfile.load()
+      .then(() => App._updateProfileButton())
+      .catch(() => {});
     /* Belépéskor automatikus pollen + időjárás szinkron */
     if (event === 'SIGNED_IN') {
       App._syncOnLogin();
     }
   }
+  /* Azonnal megjelenítünk egy közbülső állapotot (monogram), amíg az avatar tölt */
   App._updateProfileButton();
   /* Login/logout után az aktuális oldal újratöltése – adatokat megmutatja/elrejti */
   const page = App._currentPage || 'dashboard';
@@ -416,6 +420,8 @@ App._syncOnLogin = async function () {
   App._setSyncState('pending');
   try {
     const fetches = [];
+    /* Megosztott pollenadatok letöltése Supabase-ből (minden user látja) */
+    if (App.PollenFetcher) fetches.push(App.PollenFetcher.pullFromSupabase().catch(() => {}));
     if (App.PollenFetcher) fetches.push(App.PollenFetcher.fetchAll().catch(() => {}));
     if (App.Weather)       fetches.push(App.Weather.fetchForCurrentLocation(true).catch(() => {}));
     await Promise.all(fetches);

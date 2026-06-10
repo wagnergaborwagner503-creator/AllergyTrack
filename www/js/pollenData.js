@@ -364,6 +364,8 @@ App.PollenData = {
           App.toast('Holnapi előrejelzés nem elérhető.', 'info'); return;
         }
         await App.db.savePollenEntries(result.entries);
+        /* Megosztott sync */
+        App.PollenFetcher?.pushToSupabase?.(result.entries).catch(() => {});
         App.toast(`Holnapi előrejelzés letöltve: ${result.entries.length} bejegyzés`, 'success');
         this._applyFilters();
       } catch (err) {
@@ -389,6 +391,9 @@ App.PollenData = {
 
         /* Auto-save: API data is trusted, no manual review needed */
         await App.db.savePollenData(result.entries);
+
+        /* Megosztott sync: feltölti Supabase-be → minden felhasználónál frissül */
+        App.PollenFetcher?.pushToSupabase?.(result.entries).catch(() => {});
 
         const todayISO  = App.DATA.todayISO();
         const dates     = [...new Set(result.entries.map(e => e.date))].sort();
@@ -428,8 +433,11 @@ App.PollenData = {
     /* Save parsed data */
     document.getElementById('save-parsed-btn')?.addEventListener('click', async () => {
       if (!self._parsedData?.length) return;
-      await App.db.savePollenData(self._parsedData);
-      App.toast(`${self._parsedData.length} bejegyzés mentve!`, 'success');
+      const entries = self._parsedData;
+      await App.db.savePollenData(entries);
+      /* Megosztott sync: PDF-ből feltöltött adat minden felhasználónál frissül */
+      App.PollenFetcher?.pushToSupabase?.(entries).catch(() => {});
+      App.toast(`${entries.length} bejegyzés mentve!`, 'success');
       document.getElementById('parse-result').style.display = 'none';
       self._parsedData = null;
       App.navigate('pollen');

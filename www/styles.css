@@ -1624,3 +1624,27 @@ canvas { max-width: 100%; }
 }
 .btn-link:hover { color: var(--accent-light); }
 
+/* ── Visszajelzés kategória gombok ─────────────────────── */
+.feedback-cat-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--r-md);
+  border: 1.5px solid var(--border-2);
+  background: var(--bg-2);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all var(--t-fast);
+  white-space: nowrap;
+}
+.feedback-cat-btn.active {
+  border-color: var(--cat-color, var(--accent));
+  background: color-mix(in srgb, var(--cat-color, var(--accent)) 12%, transparent);
+  color: var(--cat-color, var(--accent));
+}
+.feedback-cat-btn:active { transform: scale(.96); }
+

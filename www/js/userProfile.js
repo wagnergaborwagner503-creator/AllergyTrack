@@ -24,6 +24,8 @@ App.UserProfile = {
       /* PGRST116 = sor nem létezik – még nincs profil (nem hiba) */
       if (error && error.code !== 'PGRST116') throw error;
       this._data = data ?? null;
+      /* Profil gomb azonnal frissítése az avatar megjelenítéséhez */
+      App._updateProfileButton?.();
       App._setSyncState?.('ok');
       return this._data;
     } catch (e) {
@@ -385,21 +387,20 @@ App.UserProfile = {
     App.showModal(`
       <div class="modal-handle"></div>
 
-      <!-- Profil fejléc -->
-      <div style="display:flex;align-items:center;gap:14px;padding:8px 0 20px;border-bottom:1px solid var(--border);margin-bottom:16px">
-        <div class="profile-avatar-lg">${avatarHtml}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:800;font-size:17px;color:var(--text);line-height:1.2">${this._esc(name)}</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this._esc(email)}</div>
-          <div style="display:flex;align-items:center;gap:5px;margin-top:5px">
-            <div style="width:7px;height:7px;border-radius:50%;background:#4CAF50;flex-shrink:0"></div>
-            <span style="font-size:11px;color:var(--text-3)">Bejelentkezve · szinkronizálás aktív</span>
-          </div>
+      <!-- Profil fejléc – középre igazított, nagy avatar + Szerkesztés overlay -->
+      <div style="text-align:center;padding:8px 0 20px;border-bottom:1px solid var(--border);margin-bottom:16px">
+        <!-- Kattintható avatar Szerkesztés overlay-jel -->
+        <div id="prof-avatar-btn" style="width:86px;height:86px;border-radius:50%;margin:0 auto 12px;position:relative;cursor:pointer;overflow:hidden;display:inline-block;flex-shrink:0">
+          <div class="profile-avatar-lg" style="width:86px;height:86px;font-size:30px;margin:0;border-radius:50%">${avatarHtml}</div>
+          <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);padding:5px 0 4px;font-size:10px;font-weight:700;color:#fff;text-align:center;letter-spacing:.3px;pointer-events:none">Szerkesztés</div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <button class="btn btn-ghost" id="prof-edit-name-btn" style="padding:6px 10px;font-size:12px;white-space:nowrap">✏️ Szerk.</button>
-          <button class="btn btn-ghost" id="prof-avatar-btn" style="padding:6px 10px;font-size:12px;white-space:nowrap">📷 Kép</button>
+        <div style="font-weight:800;font-size:17px;color:var(--text);line-height:1.2">${this._esc(name)}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis">${this._esc(email)}</div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:5px;margin-top:5px">
+          <div style="width:7px;height:7px;border-radius:50%;background:#4CAF50;flex-shrink:0"></div>
+          <span style="font-size:11px;color:var(--text-3)">Bejelentkezve · szinkronizálás aktív</span>
         </div>
+        <button class="btn btn-ghost" id="prof-edit-name-btn" style="margin-top:10px;padding:5px 14px;font-size:12px">✏️ Név szerkesztése</button>
       </div>
 
       <!-- Gyorslinkek -->

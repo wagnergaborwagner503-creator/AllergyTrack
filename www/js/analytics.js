@@ -689,7 +689,7 @@ App.Analytics = {
     /* Also include future forecast dates in the date list */
     const todayISO = App.DATA.todayISO();
     const forecastDates = this._pollenForecast
-      ? [...new Set(this._pollenForecast.map(p => p.date))].sort()
+      ? [...new Set(this._pollenForecast.map(p => p.date))].sort().slice(0, 3)
       : [];
     /* Előrejelzés átlag – szintén csak Alacsony (≥1) és feletti értékek */
     const forecastPollenByDate = {};
@@ -1048,7 +1048,7 @@ App.Analytics = {
     }
 
     /* Build sorted date list */
-    const dates = [...new Set(pollenForecast.map(p => p.date))].sort();
+    const dates = [...new Set(pollenForecast.map(p => p.date))].sort().slice(0, 3);
     if (dates.length === 0) { if (wrap) wrap.style.display = 'none'; return; }
 
     /* Allergens with any non-zero risk */

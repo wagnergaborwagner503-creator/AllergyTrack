@@ -97,6 +97,21 @@ App.Settings = {
         </div>
       </div>
 
+      <!-- Visszajelzés -->
+      <div class="settings-section">
+        <div class="settings-section-title">Visszajelzés</div>
+        <div class="settings-group">
+          <div class="settings-item" id="feedback-btn">
+            <div class="settings-item-icon" style="background:#E8F5E9">💬</div>
+            <div class="settings-item-body">
+              <div class="settings-item-title">Visszajelzés küldése</div>
+              <div class="settings-item-sub">Hibajelentés, fejlesztési ötlet, értékelés</div>
+            </div>
+            <div class="settings-item-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Értesítések -->
       <div class="settings-section">
         <div class="settings-section-title">Értesítések</div>
@@ -437,6 +452,9 @@ App.Settings = {
       }
     });
 
+    /* ── Visszajelzés küldése ───────────────────── */
+    document.getElementById('feedback-btn')?.addEventListener('click', () => this._showFeedbackModal());
+
     /* Patch notes gomb */
     document.getElementById('patch-notes-btn')?.addEventListener('click', () => {
       if (App.PatchNotes) App.PatchNotes.showAllVersions();
@@ -571,6 +589,133 @@ Van-e olyan tünet vagy mintázat az adatokban, amely alapján allergológus fel
       symptom_logs:     humanizeLogs,
       pollen_data:      humanizePollen,
     };
+  },
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     VISSZAJELZÉS
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  _showFeedbackModal() {
+    const email = App.Auth?.email ?? '';
+
+    App.showModal(`
+      <div class="modal-handle"></div>
+      <div class="modal-title">💬 Visszajelzés küldése</div>
+      <p style="font-size:12px;color:var(--text-3);margin-bottom:16px;line-height:1.5">
+        Írd le, mit tapasztaltál vagy mi jutott eszedbe – minden visszajelzést elolvasok!
+      </p>
+
+      <!-- Kategória -->
+      <div class="form-group">
+        <label class="form-label">Kategória</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="fb-category-grid">
+          <button class="feedback-cat-btn active" data-cat="bug"     style="--cat-color:#EF5350">🐛 Hibajelentés</button>
+          <button class="feedback-cat-btn"        data-cat="idea"    style="--cat-color:#42A5F5">💡 Fejlesztési ötlet</button>
+          <button class="feedback-cat-btn"        data-cat="praise"  style="--cat-color:#66BB6A">❤️ Értékelés</button>
+          <button class="feedback-cat-btn"        data-cat="other"   style="--cat-color:#AB47BC">💬 Egyéb</button>
+        </div>
+      </div>
+
+      <!-- Üzenet -->
+      <div class="form-group">
+        <label class="form-label">Üzenet <span style="color:var(--danger)">*</span></label>
+        <textarea class="form-control" id="fb-message" rows="4"
+          placeholder="Pl. Az időjárás szekció nem tölt be, ha nincs internet..."
+          style="resize:vertical;min-height:96px;font-size:13px;line-height:1.5"></textarea>
+        <div style="font-size:11px;color:var(--text-3);margin-top:4px;text-align:right">
+          <span id="fb-char-count">0</span> karakter
+        </div>
+      </div>
+
+      <!-- E-mail -->
+      <div class="form-group">
+        <label class="form-label">E-mail cím <span style="font-size:11px;color:var(--text-3)">(opcionális – ha válaszra vársz)</span></label>
+        <input class="form-control" id="fb-email" type="email"
+          placeholder="pelda@email.hu" value="${email}" style="font-size:13px">
+      </div>
+
+      <div id="fb-error" style="display:none;color:var(--danger);font-size:12px;margin-bottom:10px;padding:8px 12px;background:var(--danger-bg);border-radius:var(--r-sm)"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="fb-send-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="15" height="15" style="margin-right:5px">
+            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+          Elküldés
+        </button>
+        <button class="btn btn-ghost" onclick="App.closeModal()">Mégse</button>
+      </div>
+    `);
+
+    /* Kategória toggle */
+    let selectedCat = 'bug';
+    document.querySelectorAll('.feedback-cat-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.feedback-cat-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedCat = btn.dataset.cat;
+      });
+    });
+
+    /* Karakterszámláló */
+    const msgEl = document.getElementById('fb-message');
+    const cntEl = document.getElementById('fb-char-count');
+    msgEl?.addEventListener('input', () => {
+      if (cntEl) cntEl.textContent = msgEl.value.length;
+    });
+
+    /* Küldés */
+    document.getElementById('fb-send-btn')?.addEventListener('click', async () => {
+      const message = msgEl?.value?.trim() ?? '';
+      const email   = document.getElementById('fb-email')?.value?.trim() ?? '';
+      const errEl   = document.getElementById('fb-error');
+
+      if (message.length < 5) {
+        if (errEl) { errEl.textContent = 'Az üzenet legalább 5 karakter legyen.'; errEl.style.display = 'block'; }
+        return;
+      }
+
+      const btn = document.getElementById('fb-send-btn');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Küldés...'; }
+
+      const ok = await this._sendFeedback({ category: selectedCat, message, email });
+
+      if (ok) {
+        App.closeModal();
+        App.toast('✅ Köszönöm a visszajelzést!', 'success', 4000);
+      } else {
+        if (errEl) { errEl.textContent = 'Küldési hiba – próbáld újra vagy ellenőrizd az internetkapcsolatot.'; errEl.style.display = 'block'; }
+        if (btn) { btn.disabled = false; btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="15" height="15" style="margin-right:5px"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Elküldés'; }
+      }
+    });
+
+    /* Enter a textareában NE küldjön (ctrl+enter igen) */
+    msgEl?.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.ctrlKey) document.getElementById('fb-send-btn')?.click();
+    });
+  },
+
+  async _sendFeedback({ category, message, email }) {
+    const sb = App.Supabase?.get?.();
+    if (!sb) {
+      console.warn('[Feedback] Supabase nincs konfigurálva.');
+      return false;
+    }
+    try {
+      const { error } = await sb.from('feedback').insert({
+        category,
+        message,
+        email:       email || null,
+        user_id:     App.Auth?.userId ?? null,
+        app_version: App.PatchNotes?.CURRENT_VERSION ?? null,
+        user_agent:  navigator.userAgent.slice(0, 200),
+      });
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.error('[Feedback] Küldési hiba:', e);
+      return false;
+    }
   },
 
   async loadStorageStats() {
