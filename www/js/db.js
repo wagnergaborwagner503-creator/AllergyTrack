@@ -75,6 +75,15 @@ App.db = (function () {
     });
   }
 
+  /* ── UUID generátor ─────────────────────────── */
+  function _genSyncId() {
+    if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
   /* ── Adathozzáférés-ellenőrzés ───────────────
      Ha Supabase konfigurálva van, de nincs bejelentkezett felhasználó,
      a személyes adatok nem olvashatók / írhatók.
@@ -96,12 +105,27 @@ App.db = (function () {
     const store = tx('symptoms_log', 'readwrite');
     const record = {
       ...entry,
+      sync_id:    entry.sync_id    || _genSyncId(),
       created_at: entry.created_at || new Date().toISOString(),
-      date: entry.date || App.DATA.todayISO(),
+      date:       entry.date       || App.DATA.todayISO(),
     };
+    let result;
     if (record.id) {
-      return promisify(store.put(record));
+      result = await promisify(store.put(record));
+    } else {
+      delete record.id;
+      result = await promisify(store.add(record));
     }
+    /* Cloud push – fire & forget */
+    App.CloudSync?.pushSymptomLog?.(record);
+    return result;
+  }
+
+  /* Felhőből visszaállított napló mentése – nem triggerel push-t */
+  async function saveSymptomsLogFromCloud(entry) {
+    await open();
+    const store  = tx('symptoms_log', 'readwrite');
+    const record = { ...entry };
     delete record.id;
     return promisify(store.add(record));
   }
@@ -322,7 +346,10 @@ App.db = (function () {
   async function saveAllergenProfile(entry) {
     if (!_canWrite()) return null;
     await open();
-    return promisify(tx('allergen_profile', 'readwrite').put(entry));
+    const result = await promisify(tx('allergen_profile', 'readwrite').put(entry));
+    /* Debounced cloud push */
+    App.CloudSync?.pushAllergenProfile?.();
+    return result;
   }
 
   async function getAllergenProfile() {
@@ -479,7 +506,8 @@ App.db = (function () {
   return {
     init: open,
     /* Log */
-    saveSymptomsLog, getSymptomsLogs, getRecentLogs,
+    saveSymptomsLog, saveSymptomsLogFromCloud,
+    getSymptomsLogs, getRecentLogs,
     getSymptomsLogById, deleteSymptomsLog,
     /* Pollen */
     savePollenData, savePollenEntries, savePollenDataForecast,

@@ -420,6 +420,8 @@ App._syncOnLogin = async function () {
   App._setSyncState('pending');
   try {
     const fetches = [];
+    /* Személyes adatok szinkronizálása (tünetnapló + allergen profil) */
+    if (App.CloudSync)     fetches.push(App.CloudSync.pullAll().catch(() => {}));
     /* Megosztott pollenadatok letöltése Supabase-ből (minden user látja) */
     if (App.PollenFetcher) fetches.push(App.PollenFetcher.pullFromSupabase().catch(() => {}));
     if (App.PollenFetcher) fetches.push(App.PollenFetcher.fetchAll().catch(() => {}));
