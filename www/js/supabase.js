@@ -14,8 +14,8 @@ window.App = window.App || {};
 App.Supabase = {
 
   /* ─── KONFIGURÁCIÓ – cseréld ki a saját értékeidre ─── */
-  URL:      'https://YOUR-PROJECT-ID.supabase.co',
-  ANON_KEY: 'YOUR-ANON-KEY',
+  URL:      'https://mwutxdzkzdqgfvchstg.supabase.co',
+  ANON_KEY: 'sb_publishable_MclRezKsuMjLAqUoWIUPgA_6OCIBzrj',
   /* ─────────────────────────────────────────────────── */
 
   _client: null,
