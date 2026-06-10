@@ -311,9 +311,20 @@ App.init = async function () {
     /* Navigate to dashboard (vagy deep-link oldal) */
     await App.navigate(startPage);
 
-    /* Ha be van jelentkezve – profil betöltése a háttérben */
+    /* Megosztott pollenadat letöltése – nyilvános, nem kell bejelentkezés */
+    if (App.PollenFetcher) {
+      App.PollenFetcher.pullFromSupabase().catch(() => {});
+    }
+
+    /* Ha be van jelentkezve (meglévő session) – profil + személyes adatok betöltése */
     if (_initialUser && App.UserProfile) {
-      App.UserProfile.load().catch(() => {});
+      App.UserProfile.load()
+        .then(() => App._updateProfileButton())
+        .catch(() => {});
+      /* Személyes adatok szinkronizálása (tünetnapló, allergen profil) */
+      if (App.CloudSync) {
+        App.CloudSync.pullAll().catch(() => {});
+      }
     }
 
     /* Patch notes – első indítás után az új verzióban */
@@ -403,9 +414,13 @@ App._onAuthChange = function (event, user) {
     App.UserProfile.load()
       .then(() => App._updateProfileButton())
       .catch(() => {});
-    /* Belépéskor automatikus pollen + időjárás szinkron */
-    if (event === 'SIGNED_IN') {
-      App._syncOnLogin();
+
+    /* Szinkron:
+       SIGNED_IN      = új bejelentkezés → teljes szinkron
+       INITIAL_SESSION = app újraindítás meglévő session-nel → személyes adatok szinkronizálása
+       TOKEN_REFRESHED = token megújítás → nem kell szinkron                    */
+    if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+      App._syncOnLogin(event === 'INITIAL_SESSION');
     }
   }
   /* Azonnal megjelenítünk egy közbülső állapotot (monogram), amíg az avatar tölt */
@@ -416,16 +431,28 @@ App._onAuthChange = function (event, user) {
 };
 
 /** Belépéskor automatikusan szinkronizálja a pollen + időjárás adatokat */
-App._syncOnLogin = async function () {
+/**
+ * isRestore = true  → app újraindítás meglévő session-nel
+ *                      csak Supabase-pull, nem hív Open-Meteo API-t újra
+ * isRestore = false → friss bejelentkezés: teljes szinkron + API fetch
+ */
+App._syncOnLogin = async function (isRestore = false) {
   App._setSyncState('pending');
   try {
     const fetches = [];
-    /* Személyes adatok szinkronizálása (tünetnapló + allergen profil) */
+
+    /* Személyes adatok: tünetnapló + allergen profil (mindig) */
     if (App.CloudSync)     fetches.push(App.CloudSync.pullAll().catch(() => {}));
-    /* Megosztott pollenadatok letöltése Supabase-ből (minden user látja) */
+
+    /* Megosztott pollenadatok Supabase-ből (mindig – ez a "szerver pollen") */
     if (App.PollenFetcher) fetches.push(App.PollenFetcher.pullFromSupabase().catch(() => {}));
-    if (App.PollenFetcher) fetches.push(App.PollenFetcher.fetchAll().catch(() => {}));
-    if (App.Weather)       fetches.push(App.Weather.fetchForCurrentLocation(true).catch(() => {}));
+
+    /* Friss API adatok csak új bejelentkezésnél – ne terheljük az Open-Meteo-t minden indításnál */
+    if (!isRestore) {
+      if (App.PollenFetcher) fetches.push(App.PollenFetcher.fetchAll().catch(() => {}));
+      if (App.Weather)       fetches.push(App.Weather.fetchForCurrentLocation(true).catch(() => {}));
+    }
+
     await Promise.all(fetches);
     App._setSyncState('ok');
     /* Szinkron után dashboard frissítése ha azon vagyunk */
