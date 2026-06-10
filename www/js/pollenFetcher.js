@@ -396,6 +396,24 @@ App.PollenFetcher = {
     return null;
   },
 
+  /* ── fetchAll: fetchLatest + push to Supabase ────────────────────────────
+     Ez az a metódus amit _syncOnLogin() hív. Letölti az Open-Meteo + ÁNTSZ
+     adatokat, menti IndexedDB-be, majd feltölti a megosztott Supabase táblába
+     hogy minden felhasználó lássa.                                            */
+  async fetchAll() {
+    try {
+      const result = await this.fetchLatest();
+      if (result?.entries?.length) {
+        /* Push a megosztott táblába – ha be van jelentkezve */
+        this.pushToSupabase(result.entries).catch(() => {});
+      }
+      return result;
+    } catch (e) {
+      console.warn('[PollenFetcher] fetchAll hiba:', e.message ?? e);
+      throw e;
+    }
+  },
+
   /* ── Supabase megosztott pollenadatok: feltöltés ─────────────────────────
      Ha be van jelentkezve a felhasználó, az éppen mentett pollenadatokat
      feltölti a shared_pollen_data táblába – így minden user látja.          */
@@ -430,7 +448,7 @@ App.PollenFetcher = {
      pollenadatokat és elmenti IndexedDB-be.                                 */
   async pullFromSupabase() {
     const sb = App.Supabase?.get?.();
-    if (!sb) return;
+    if (!sb) return 0;
 
     try {
       const { data, error } = await sb
@@ -439,14 +457,29 @@ App.PollenFetcher = {
         .order('date', { ascending: false })
         .limit(3000);
 
-      if (error) throw error;
-      if (!data?.length) return;
+      if (error) {
+        console.warn('[PollenSync] pullFromSupabase – Supabase hiba:', error.message, '| Kód:', error.code);
+        console.warn('[PollenSync] TIPP: Futtasd le a shared_pollen_data SQL-t a Supabase SQL Editor-ban!');
+        return 0;
+      }
+      if (!data?.length) {
+        console.log('[PollenSync] A shared_pollen_data tábla üres – nincs letölteni való.');
+        return 0;
+      }
 
       await App.db.savePollenData(data);
       console.log(`[PollenSync] ${data.length} megosztott pollenadatat letöltve.`);
-      return data;
+
+      /* UI frissítése ha a dashboard vagy pollen oldalon vagyunk */
+      const page = App._currentPage;
+      if (page === 'dashboard' || page === 'pollen') {
+        App.navigate(page).catch(() => {});
+      }
+
+      return data.length;
     } catch (e) {
-      console.warn('[PollenSync] pullFromSupabase hiba:', e);
+      console.warn('[PollenSync] pullFromSupabase hiba:', e.message ?? e);
+      return 0;
     }
   },
 
