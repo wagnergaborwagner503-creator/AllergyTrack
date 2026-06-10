@@ -15,6 +15,8 @@ window.App = window.App || {};
 
 App.CloudSync = {
 
+  _isPulling: false,   /* concurrency guard – megakadályozza a párhuzamos pull-t */
+
   /* ── UUID generátor ──────────────────────────── */
   _uid() {
     if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
@@ -65,9 +67,16 @@ App.CloudSync = {
      TÜNETNAPLÓ – PULL (bejelentkezéskor)
   ══════════════════════════════════════════════ */
   async pullSymptomLogs() {
+    /* Concurrency guard: ha már fut egy pull, ne indítsunk másikat */
+    if (this._isPulling) {
+      console.log('[CloudSync] pullSymptomLogs kihagyva – már fut');
+      return 0;
+    }
+    this._isPulling = true;
+
     const sb  = this._sb();
     const uid = this._uid_();
-    if (!sb || !uid) return 0;
+    if (!sb || !uid) { this._isPulling = false; return 0; }
 
     try {
       const { data, error } = await sb
@@ -110,6 +119,8 @@ App.CloudSync = {
     } catch (e) {
       console.warn('[CloudSync] pullSymptomLogs hiba:', e.message ?? e);
       return 0;
+    } finally {
+      this._isPulling = false;
     }
   },
 
@@ -191,9 +202,54 @@ App.CloudSync = {
   },
 
   /* ══════════════════════════════════════════════
+     HELYI DUPLIKÁTUMOK ELTÁVOLÍTÁSA
+     Azonos sync_id-jű bejegyzések közül csak egyet tart meg.
+     Régebbi duplikátumok (ID szerint kisebb) törlődnek.
+  ══════════════════════════════════════════════ */
+  async deduplicateLocal() {
+    try {
+      const all = await App.db.getRecentLogs(9999);
+
+      /* sync_id → legelső (legkisebb id) rekord */
+      const seen   = {};   /* sync_id → rekord */
+      const remove = [];   /* törlendő id-k */
+
+      for (const entry of all) {
+        if (!entry.sync_id) continue;
+        if (seen[entry.sync_id]) {
+          /* duplikátum – a nagyobb id-jűt töröljük (újabb, felesleges másolat) */
+          const keep = seen[entry.sync_id].id < entry.id
+            ? seen[entry.sync_id] : entry;
+          const del  = seen[entry.sync_id].id < entry.id
+            ? entry : seen[entry.sync_id];
+          seen[entry.sync_id] = keep;
+          remove.push(del.id);
+        } else {
+          seen[entry.sync_id] = entry;
+        }
+      }
+
+      if (remove.length) {
+        for (const id of remove) {
+          await App.db.deleteSymptomsLog(id);
+        }
+        console.log(`[CloudSync] ${remove.length} duplikált bejegyzés eltávolítva.`);
+        App.toast(`🧹 ${remove.length} duplikált bejegyzés eltávolítva`, 'info', 4000);
+      }
+      return remove.length;
+    } catch (e) {
+      console.warn('[CloudSync] deduplicateLocal hiba:', e.message ?? e);
+      return 0;
+    }
+  },
+
+  /* ══════════════════════════════════════════════
      MINDEN LETÖLTÉSE – bejelentkezéskor hívódik
   ══════════════════════════════════════════════ */
   async pullAll() {
+    /* Először deduplikálunk – a pull előtt takarítunk */
+    await this.deduplicateLocal();
+
     await Promise.allSettled([
       this.pullSymptomLogs(),
       this.pullAllergenProfile(),

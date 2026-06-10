@@ -316,15 +316,13 @@ App.init = async function () {
       App.PollenFetcher.pullFromSupabase().catch(() => {});
     }
 
-    /* Ha be van jelentkezve (meglévő session) – profil + személyes adatok betöltése */
+    /* Ha be van jelentkezve (meglévő session) – profil betöltése
+       MEGJEGYZÉS: a CloudSync.pullAll() az _onAuthChange INITIAL_SESSION ágában
+       fut le – NEM hívjuk meg itt is, különben kettős pull → duplikált bejegyzések */
     if (_initialUser && App.UserProfile) {
       App.UserProfile.load()
         .then(() => App._updateProfileButton())
         .catch(() => {});
-      /* Személyes adatok szinkronizálása (tünetnapló, allergen profil) */
-      if (App.CloudSync) {
-        App.CloudSync.pullAll().catch(() => {});
-      }
     }
 
     /* Patch notes – első indítás után az új verzióban */
