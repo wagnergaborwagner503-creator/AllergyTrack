@@ -356,6 +356,9 @@ App.init = async function () {
     if (App.Supabase?.isConfigured && !App.Auth?.isLoggedIn) {
       const seenAuth = localStorage.getItem('allergytrack_seen_auth');
       if (!seenAuth) {
+        /* Flag azonnal beállítva – a panel csak egyszer jelenik meg automatikusan,
+           függetlenül attól, hogy a felhasználó hogyan zárja be */
+        localStorage.setItem('allergytrack_seen_auth', '1');
         setTimeout(() => {
           /* Csak akkor mutatjuk, ha nincs más modal nyitva (pl. patch notes) */
           const overlay = document.getElementById('modal-overlay');
