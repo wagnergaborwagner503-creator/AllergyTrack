@@ -1,0 +1,15 @@
+{
+  "appId": "com.allergytrack.app",
+  "appName": "AllergyTrack",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 500,
+      "backgroundColor": "#2E7D32"
+    }
+  }
+}

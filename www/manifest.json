@@ -1,0 +1,45 @@
+{
+  "name": "AllergyTrack – Allergia Napló",
+  "short_name": "AllergyTrack",
+  "description": "Személyes allergia követő, tünetnapló és pollenadatok egy helyen. Telepíthető PWA, offline is működik.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0D1810",
+  "theme_color": "#2E7D32",
+  "orientation": "portrait-primary",
+  "lang": "hu",
+  "categories": ["health", "medical", "lifestyle"],
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><circle cx='96' cy='96' r='96' fill='%232E7D32'/><text y='130' x='50%' font-size='110' text-anchor='middle'>🌿</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='115' fill='%232E7D32'/><text y='370' x='50%' font-size='300' text-anchor='middle'>🌿</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Új bejegyzés",
+      "short_name": "Napló",
+      "description": "Gyors tünetbejegyzés hozzáadása",
+      "url": "./index.html?page=log-new",
+      "icons": [{ "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><circle cx='48' cy='48' r='48' fill='%232E7D32'/><text y='68' x='50%' font-size='54' text-anchor='middle'>✏️</text></svg>", "sizes": "96x96" }]
+    },
+    {
+      "name": "Pollenadatok",
+      "short_name": "Pollen",
+      "description": "Aktuális pollenadatok megtekintése",
+      "url": "./index.html?page=pollen",
+      "icons": [{ "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><circle cx='48' cy='48' r='48' fill='%232E7D32'/><text y='68' x='50%' font-size='54' text-anchor='middle'>🌸</text></svg>", "sizes": "96x96" }]
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}

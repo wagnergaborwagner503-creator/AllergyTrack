@@ -1,0 +1,27 @@
+{
+  "name": "allergia-apk",
+  "version": "1.2.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "browser-sync start --server www --port 3131 --files \"www/**/*\" --no-notify",
+    "build": "npx cap sync android",
+    "open": "npx cap open android"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/geolocation": "^8.2.0",
+    "@capacitor/local-notifications": "^8.2.0"
+  },
+  "devDependencies": {
+    "browser-sync": "^3.0.4",
+    "sharp": "^0.34.5"
+  }
+}
