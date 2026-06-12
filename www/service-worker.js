@@ -3,7 +3,7 @@
    Cache-first stratégia statikus erőforrásokhoz
    ═══════════════════════════════════════════════ */
 
-const CACHE = 'allergytrack-v1.7.0';
+const CACHE = 'allergytrack-v1.7.1';
 
 const STATIC = [
   './',
@@ -12,6 +12,7 @@ const STATIC = [
   './manifest.json',
   './js/data.js',
   './js/db.js',
+  './js/pdfParser.js',
   './js/patchNotes.js',
   './js/weatherService.js',
   './js/notifications.js',
@@ -83,6 +84,28 @@ self.addEventListener('fetch', event => {
           return resp;
         })
       )
+    );
+    return;
+  }
+
+  /* HTML navigáció: network first – online mindig a friss app shell
+     töltődik, így nem ragad be régi verzió; offline cache fallback */
+  if (request.mode === 'navigate' || request.destination === 'document') {
+    event.respondWith(
+      fetch(request)
+        .then(resp => {
+          if (resp.ok) {
+            const clone = resp.clone();
+            caches.open(CACHE).then(c => c.put(request, clone));
+          }
+          return resp;
+        })
+        .catch(() =>
+          caches.match(request).then(cached =>
+            cached ?? caches.match('./index.html').then(idx =>
+              idx ?? new Response('Offline', { status: 503 }))
+          )
+        )
     );
     return;
   }
