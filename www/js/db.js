@@ -84,6 +84,24 @@ App.db = (function () {
     });
   }
 
+  /* ── Tünetbejegyzés tartalom-ujjlenyomat ─────
+     Két bejegyzés duplikátum, ha ugyanaz a dátum, időpont,
+     tünetek (súlyossággal), összesített súlyosság és jegyzet. */
+  function _logFingerprint(e) {
+    const syms = (e.symptoms || [])
+      .map(s => `${s.id}:${s.severity ?? ''}`)
+      .sort()
+      .join(',');
+    return [
+      e.date,
+      e.time ?? '',
+      e.no_symptoms ? 1 : 0,
+      e.overall_severity ?? 0,
+      syms,
+      (e.notes ?? '').trim(),
+    ].join('|');
+  }
+
   /* ── Adathozzáférés-ellenőrzés ───────────────
      Ha Supabase konfigurálva van, de nincs bejelentkezett felhasználó,
      a személyes adatok nem olvashatók / írhatók.
@@ -102,13 +120,23 @@ App.db = (function () {
   async function saveSymptomsLog(entry) {
     if (!_canWrite()) return null;
     await open();
-    const store = tx('symptoms_log', 'readwrite');
     const record = {
       ...entry,
       sync_id:    entry.sync_id    || _genSyncId(),
       created_at: entry.created_at || new Date().toISOString(),
       date:       entry.date       || App.DATA.todayISO(),
     };
+
+    /* ÚJ bejegyzésnél tartalom-duplikátum ellenőrzés:
+       ha pontosan ugyanilyen bejegyzés már létezik, nem mentjük újra */
+    if (!record.id) {
+      const all = await getAll('symptoms_log');
+      const fp  = _logFingerprint(record);
+      const dup = all.find(e => _logFingerprint(e) === fp);
+      if (dup) return dup.id;
+    }
+
+    const store = tx('symptoms_log', 'readwrite');
     let result;
     if (record.id) {
       result = await promisify(store.put(record));
@@ -121,13 +149,55 @@ App.db = (function () {
     return result;
   }
 
-  /* Felhőből visszaállított napló mentése – nem triggerel push-t */
+  /* Felhőből visszaállított napló mentése – nem triggerel push-t.
+     Tartalom-duplikátum esetén (más sync_id, azonos adat) nem ment. */
   async function saveSymptomsLogFromCloud(entry) {
     await open();
+    const all = await getAll('symptoms_log');
+    const fp  = _logFingerprint(entry);
+    if (all.some(e => _logFingerprint(e) === fp)) return null;
     const store  = tx('symptoms_log', 'readwrite');
     const record = { ...entry };
     delete record.id;
     return promisify(store.add(record));
+  }
+
+  /* ── Visszamenőleges tünetnapló-deduplikáció ──
+     Azonos tartalmú bejegyzésekből csak egyet tart meg
+     (előnyben: sync_id-vel rendelkező, legrégebbi).
+     Visszaadja a törölt rekordok sync_id-jait is, hogy a
+     felhőből is törölhetők legyenek. */
+  async function deduplicateSymptomsLog() {
+    await open();
+    const all = await getAll('symptoms_log');
+    const groups = {};
+    all.forEach(e => {
+      const fp = _logFingerprint(e);
+      if (!groups[fp]) groups[fp] = [];
+      groups[fp].push(e);
+    });
+
+    const store = tx('symptoms_log', 'readwrite');
+    let removed = 0;
+    const removedSyncIds = [];
+
+    for (const recs of Object.values(groups)) {
+      if (recs.length <= 1) continue;
+      /* Megtartandó: sync_id-s előnyben, azon belül legkisebb id */
+      recs.sort((a, b) => {
+        if (!!a.sync_id !== !!b.sync_id) return a.sync_id ? -1 : 1;
+        return (a.id ?? 0) - (b.id ?? 0);
+      });
+      const keep = recs[0];
+      for (let i = 1; i < recs.length; i++) {
+        await promisify(store.delete(recs[i].id));
+        removed++;
+        if (recs[i].sync_id && recs[i].sync_id !== keep.sync_id) {
+          removedSyncIds.push(recs[i].sync_id);
+        }
+      }
+    }
+    return { removed, removedSyncIds };
   }
 
   async function getSymptomsLogs(dateFrom, dateTo) {
@@ -181,11 +251,16 @@ App.db = (function () {
     const store = tx('pollen_data', 'readwrite');
     const now   = new Date().toISOString();
     const promises = [];
+    const seenInBatch = new Set();   /* batch-en belüli duplikátumok kiszűrése */
 
     for (const entry of entries) {
       const key      = `${entry.date}|${entry.location}|${entry.allergen_id}`;
       const existing = existingMap[key] || [];
       const src      = (entry.source || '').toLowerCase();
+
+      /* Batch-dedulikáció: ugyanaz a kulcs egy híváson belül csak egyszer */
+      if (seenInBatch.has(key)) continue;
+      seenInBatch.add(key);
 
       /* Forrás-dedulikáció: ha ugyanez a forrás már benne van, skip */
       if (src && existing.some(e => (e.source || '').toLowerCase() === src)) {
@@ -230,10 +305,14 @@ App.db = (function () {
     const store = tx('pollen_data', 'readwrite');
     const now   = new Date().toISOString();
     const promises = [];
+    const seenInBatch = new Set();   /* batch-en belüli duplikátumok kiszűrése */
 
     for (const entry of entries) {
       const key      = `${entry.date}|${entry.location}|${entry.allergen_id}`;
       const existing = existingMap[key] || [];
+
+      if (seenInBatch.has(key)) continue;
+      seenInBatch.add(key);
 
       if (existing.length === 0) {
         const record = { ...entry, created_at: now };
@@ -492,6 +571,10 @@ App.db = (function () {
         await promisify(store.put(row));
       }
     }
+
+    /* Import utáni deduplikáció: a fájlon belüli duplikátumok eltávolítása */
+    await deduplicateSymptomsLog();
+    await deduplicatePollenData();
   }
 
   async function clearAllData() {
@@ -509,6 +592,7 @@ App.db = (function () {
     saveSymptomsLog, saveSymptomsLogFromCloud,
     getSymptomsLogs, getRecentLogs,
     getSymptomsLogById, deleteSymptomsLog,
+    deduplicateSymptomsLog,
     /* Pollen */
     savePollenData, savePollenEntries, savePollenDataForecast,
     getPollenData, getLatestPollenData,

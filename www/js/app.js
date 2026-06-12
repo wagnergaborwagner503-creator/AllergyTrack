@@ -311,6 +311,22 @@ App.init = async function () {
     /* Navigate to dashboard (vagy deep-link oldal) */
     await App.navigate(startPage);
 
+    /* Visszamenőleges deduplikáció minden induláskor:
+       pollen + tünetnapló duplikátumok eltávolítása (helyi).
+       A felhő-oldali tisztítást a CloudSync.deduplicateLocal végzi
+       bejelentkezéskor (pullAll részeként). */
+    Promise.all([
+      App.db.deduplicatePollenData(),
+      App.db.deduplicateSymptomsLog(),
+    ]).then(([pollenRemoved, symResult]) => {
+      const total = (pollenRemoved || 0) + (symResult?.removed || 0);
+      if (total > 0) {
+        console.log(`[Dedup] ${pollenRemoved} pollen + ${symResult.removed} tünet duplikátum eltávolítva.`);
+        App.toast(`🧹 ${total} duplikált adat eltávolítva`, 'info', 4000);
+        if (App._currentPage === 'dashboard') App.navigate('dashboard').catch(() => {});
+      }
+    }).catch(() => {});
+
     /* Megosztott pollenadat letöltése – nyilvános, nem kell bejelentkezés */
     if (App.PollenFetcher) {
       App.PollenFetcher.pullFromSupabase().catch(() => {});

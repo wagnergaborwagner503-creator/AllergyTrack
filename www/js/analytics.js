@@ -893,6 +893,33 @@ App.Analytics = {
       return;
     }
 
+    /* ── MINIMUM 14 tünetadatos nap szükséges az elemzéshez ──
+       Az összes (nem csak a kiválasztott időszakbeli) naplót nézzük,
+       hogy a 7 napos nézetben is elérhető legyen az elemzés. */
+    const MIN_SYMPTOM_DAYS = 14;
+    const allSymptomDays = new Set((this._allLogs || logs).map(l => l.date)).size;
+    if (allSymptomDays < MIN_SYMPTOM_DAYS) {
+      const pct = Math.round((allSymptomDays / MIN_SYMPTOM_DAYS) * 100);
+      el.innerHTML = `
+        <div style="text-align:center;padding:14px 8px 8px">
+          <div style="font-size:34px;margin-bottom:8px">📊</div>
+          <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:4px">
+            Még ${MIN_SYMPTOM_DAYS - allSymptomDays} nap tünetadat szükséges
+          </div>
+          <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-bottom:12px">
+            A megbízható mintázat-elemzéshez legalább <strong>${MIN_SYMPTOM_DAYS} olyan nap</strong> kell,
+            amelyen rögzítettél tünetadatot. Jelenleg: <strong>${allSymptomDays}/${MIN_SYMPTOM_DAYS} nap</strong>.
+          </div>
+          <div class="progress-bar-wrap" style="max-width:220px;margin:0 auto">
+            <div class="progress-bar" style="width:${pct}%"></div>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:6px">
+            Tipp: a tünetmentes napokat is rögzítheted – azok is számítanak!
+          </div>
+        </div>`;
+      return;
+    }
+
     /* How many unique symptom log days do we have? */
     const symptomDays = new Set(logs.map(l => l.date)).size;
 

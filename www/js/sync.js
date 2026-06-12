@@ -202,22 +202,24 @@ App.CloudSync = {
   },
 
   /* ══════════════════════════════════════════════
-     HELYI DUPLIKÁTUMOK ELTÁVOLÍTÁSA
-     Azonos sync_id-jű bejegyzések közül csak egyet tart meg.
-     Régebbi duplikátumok (ID szerint kisebb) törlődnek.
+     DUPLIKÁTUMOK ELTÁVOLÍTÁSA (helyi + felhő)
+     1. Azonos sync_id-jű bejegyzésekből csak egy marad
+     2. Azonos TARTALMÚ bejegyzésekből (eltérő sync_id
+        mellett is) csak egy marad – db.deduplicateSymptomsLog
+     3. A törölt duplikátumok sync_id-jai a felhőből
+        (Supabase symptom_logs) is törlődnek
   ══════════════════════════════════════════════ */
   async deduplicateLocal() {
     try {
       const all = await App.db.getRecentLogs(9999);
 
-      /* sync_id → legelső (legkisebb id) rekord */
+      /* ① sync_id alapú duplikátumok */
       const seen   = {};   /* sync_id → rekord */
       const remove = [];   /* törlendő id-k */
 
       for (const entry of all) {
         if (!entry.sync_id) continue;
         if (seen[entry.sync_id]) {
-          /* duplikátum – a nagyobb id-jűt töröljük (újabb, felesleges másolat) */
           const keep = seen[entry.sync_id].id < entry.id
             ? seen[entry.sync_id] : entry;
           const del  = seen[entry.sync_id].id < entry.id
@@ -228,15 +230,36 @@ App.CloudSync = {
           seen[entry.sync_id] = entry;
         }
       }
-
-      if (remove.length) {
-        for (const id of remove) {
-          await App.db.deleteSymptomsLog(id);
-        }
-        console.log(`[CloudSync] ${remove.length} duplikált bejegyzés eltávolítva.`);
-        App.toast(`🧹 ${remove.length} duplikált bejegyzés eltávolítva`, 'info', 4000);
+      for (const id of remove) {
+        await App.db.deleteSymptomsLog(id);
       }
-      return remove.length;
+
+      /* ② tartalom alapú duplikátumok (eltérő sync_id-vel is) */
+      const { removed: contentRemoved, removedSyncIds } =
+        await App.db.deduplicateSymptomsLog();
+
+      /* ③ a kiszűrt duplikátumok törlése a felhőből is */
+      if (removedSyncIds.length) {
+        const sb  = this._sb();
+        const uid = this._uid_();
+        if (sb && uid) {
+          sb.from('symptom_logs')
+            .delete()
+            .eq('user_id', uid)
+            .in('sync_id', removedSyncIds)
+            .then(({ error }) => {
+              if (error) console.warn('[CloudSync] felhő-dedup hiba:', error.message);
+              else console.log(`[CloudSync] ${removedSyncIds.length} duplikátum törölve a felhőből.`);
+            });
+        }
+      }
+
+      const total = remove.length + contentRemoved;
+      if (total) {
+        console.log(`[CloudSync] ${total} duplikált bejegyzés eltávolítva.`);
+        App.toast(`🧹 ${total} duplikált bejegyzés eltávolítva`, 'info', 4000);
+      }
+      return total;
     } catch (e) {
       console.warn('[CloudSync] deduplicateLocal hiba:', e.message ?? e);
       return 0;

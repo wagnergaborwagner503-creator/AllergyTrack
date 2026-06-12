@@ -53,7 +53,9 @@ App.UserProfile = {
   get avatarUrl() { return this._data?.avatar_url ?? null; },
 
   /* ── Profilkép feltöltése galériából ────────
-     Base64-be konvertál, tárolja lokálisan + Supabase-ben */
+     Fájlválasztás után képkivágó modal nyílik:
+     a felhasználó húzással + nagyítással beállítja,
+     hogy a kép melyik része látszódjon. */
   async pickAvatar() {
     return new Promise((resolve) => {
       const input = document.createElement('input');
@@ -66,34 +68,165 @@ App.UserProfile = {
         document.body.removeChild(input);
         if (!file) { resolve(null); return; }
         try {
-          const base64 = await new Promise((res, rej) => {
-            const reader = new FileReader();
-            reader.onload  = () => res(reader.result);
-            reader.onerror = rej;
-            /* Max 400×400 képbe tömörítve – Canvas segítségével */
-            const img = new Image();
-            img.onload = () => {
-              const MAX = 400;
-              const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-              const canvas = document.createElement('canvas');
-              canvas.width  = Math.round(img.width  * scale);
-              canvas.height = Math.round(img.height * scale);
-              canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-              res(canvas.toDataURL('image/jpeg', 0.82));
-            };
-            img.onerror = rej;
-            img.src = URL.createObjectURL(file);
+          const img = await new Promise((res, rej) => {
+            const i = new Image();
+            i.onload  = () => res(i);
+            i.onerror = () => rej(new Error('A kép nem olvasható'));
+            i.src = URL.createObjectURL(file);
           });
+          const base64 = await this._showCropModal(img);
+          URL.revokeObjectURL(img.src);
+          if (!base64) { resolve(null); return; }
           await this.save({ avatar_url: base64 });
           App._updateProfileButton?.();
           App.toast('✅ Profilkép frissítve!', 'success');
           resolve(base64);
         } catch (e) {
-          App.toast('Hiba a kép feltöltésekor: ' + e.message, 'error');
+          App.toast('Hiba a kép feltöltésekor: ' + (e.message || e), 'error');
           resolve(null);
         }
       });
       input.click();
+    });
+  },
+
+  /* ── Képkivágó modal ─────────────────────────
+     Kör alakú maszk, húzás (1 ujj), pinch-zoom (2 ujj),
+     zoom csúszka + görgő. 400×400 JPEG-et ad vissza. */
+  _showCropModal(img) {
+    return new Promise((resolve) => {
+      const VP = Math.min(300, Math.floor(window.innerWidth - 88));
+
+      App.showModal(`
+        <div class="modal-handle"></div>
+        <div class="modal-title" style="text-align:center;margin-bottom:6px">Kép kivágása</div>
+        <p style="font-size:12px;color:var(--text-3);text-align:center;margin-bottom:14px">
+          Húzd a képet a megfelelő helyre · csippentéssel vagy a csúszkával nagyíthatsz
+        </p>
+        <div id="crop-stage" style="position:relative;width:${VP}px;height:${VP}px;margin:0 auto;border-radius:20px;overflow:hidden;touch-action:none;cursor:grab;background:#111">
+          <canvas id="crop-canvas" style="display:block;width:${VP}px;height:${VP}px"></canvas>
+          <div style="position:absolute;inset:0;pointer-events:none;border-radius:50%;box-shadow:0 0 0 ${VP}px rgba(0,0,0,.5)"></div>
+          <div style="position:absolute;inset:0;pointer-events:none;border-radius:50%;border:2px dashed rgba(255,255,255,.9)"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;max-width:${VP}px;margin:16px auto 0">
+          <span style="font-size:15px;flex-shrink:0">🔍</span>
+          <input type="range" id="crop-zoom" min="100" max="300" value="100" style="flex:1">
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-primary" id="crop-save-btn" style="flex:1">✅ Mentés</button>
+          <button class="btn btn-ghost" id="crop-cancel-btn">Mégse</button>
+        </div>
+      `, { backdropClose: false });
+
+      const stage  = document.getElementById('crop-stage');
+      const canvas = document.getElementById('crop-canvas');
+      const slider = document.getElementById('crop-zoom');
+      if (!stage || !canvas || !slider) { resolve(null); return; }
+
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width  = VP * dpr;
+      canvas.height = VP * dpr;
+
+      /* cover-skála: a kép rövidebb oldala pont kitölti a keretet */
+      const baseScale = VP / Math.min(img.width, img.height);
+      let zoom = 1, tx = 0, ty = 0;
+
+      const clamp = () => {
+        const s = baseScale * zoom;
+        const maxX = Math.max(0, (img.width  * s - VP) / 2);
+        const maxY = Math.max(0, (img.height * s - VP) / 2);
+        tx = Math.min(maxX, Math.max(-maxX, tx));
+        ty = Math.min(maxY, Math.max(-maxY, ty));
+      };
+
+      const draw = () => {
+        const s = baseScale * zoom;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, VP, VP);
+        ctx.drawImage(img,
+          VP / 2 + tx - (img.width  * s) / 2,
+          VP / 2 + ty - (img.height * s) / 2,
+          img.width * s, img.height * s);
+      };
+
+      /* ── Húzás (1 ujj) + pinch-zoom (2 ujj) ── */
+      const pointers = new Map();
+      let pinchStart = null;
+
+      stage.addEventListener('pointerdown', e => {
+        stage.setPointerCapture(e.pointerId);
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pointers.size === 2) {
+          const [a, b] = [...pointers.values()];
+          pinchStart = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom };
+        }
+        stage.style.cursor = 'grabbing';
+      });
+
+      stage.addEventListener('pointermove', e => {
+        if (!pointers.has(e.pointerId)) return;
+        const prev = pointers.get(e.pointerId);
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        if (pointers.size === 2 && pinchStart) {
+          const [a, b] = [...pointers.values()];
+          const d = Math.hypot(a.x - b.x, a.y - b.y);
+          zoom = Math.min(3, Math.max(1, pinchStart.zoom * d / pinchStart.dist));
+          slider.value = Math.round(zoom * 100);
+        } else if (pointers.size === 1) {
+          tx += e.clientX - prev.x;
+          ty += e.clientY - prev.y;
+        }
+        clamp(); draw();
+      });
+
+      const endPointer = e => {
+        pointers.delete(e.pointerId);
+        if (pointers.size < 2) pinchStart = null;
+        if (pointers.size === 0) stage.style.cursor = 'grab';
+      };
+      stage.addEventListener('pointerup', endPointer);
+      stage.addEventListener('pointercancel', endPointer);
+
+      /* Görgő-zoom (desktop) */
+      stage.addEventListener('wheel', e => {
+        e.preventDefault();
+        zoom = Math.min(3, Math.max(1, zoom * (e.deltaY < 0 ? 1.08 : 0.93)));
+        slider.value = Math.round(zoom * 100);
+        clamp(); draw();
+      }, { passive: false });
+
+      /* Csúszka-zoom */
+      slider.addEventListener('input', () => {
+        zoom = slider.value / 100;
+        clamp(); draw();
+      });
+
+      /* ── Mentés: a látható négyzet 400×400 JPEG-be ── */
+      document.getElementById('crop-save-btn')?.addEventListener('click', () => {
+        const OUT = 400;
+        const out = document.createElement('canvas');
+        out.width = OUT; out.height = OUT;
+        const octx = out.getContext('2d');
+        const f = OUT / VP;
+        const s = baseScale * zoom * f;
+        octx.fillStyle = '#fff';
+        octx.fillRect(0, 0, OUT, OUT);
+        octx.drawImage(img,
+          OUT / 2 + tx * f - (img.width  * s) / 2,
+          OUT / 2 + ty * f - (img.height * s) / 2,
+          img.width * s, img.height * s);
+        App.closeModal();
+        resolve(out.toDataURL('image/jpeg', 0.85));
+      });
+
+      document.getElementById('crop-cancel-btn')?.addEventListener('click', () => {
+        App.closeModal();
+        resolve(null);
+      });
+
+      draw();
     });
   },
 
