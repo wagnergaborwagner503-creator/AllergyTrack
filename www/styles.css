@@ -1648,3 +1648,319 @@ canvas { max-width: 100%; }
 }
 .feedback-cat-btn:active { transform: scale(.96); }
 
+/* ═══════════════════════════════════════════════
+   DESIGN 2.0 – Modern interaktív réteg
+   A meglévő színpalettára épül, csak a megjelenést
+   és a mozgást modernizálja. (uiFx.js a párja)
+   ═══════════════════════════════════════════════ */
+
+:root {
+  --glass:        color-mix(in srgb, var(--card) 76%, transparent);
+  --glass-border: color-mix(in srgb, var(--border) 55%, transparent);
+  --glow:         0 10px 32px color-mix(in srgb, var(--accent) 20%, transparent);
+  --spring:       cubic-bezier(.34, 1.56, .64, 1);
+}
+
+/* ── Aurora háttér (passzív) ─────────────────── */
+body::before {
+  content: '';
+  position: fixed; inset: -20%;
+  z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(40% 35% at 15% 18%, color-mix(in srgb, var(--green-300) 22%, transparent), transparent 70%),
+    radial-gradient(34% 30% at 85% 12%, color-mix(in srgb, var(--accent-light) 15%, transparent), transparent 70%),
+    radial-gradient(45% 40% at 70% 88%, color-mix(in srgb, var(--green-200) 18%, transparent), transparent 70%);
+  animation: fxAurora 28s ease-in-out infinite alternate;
+}
+@keyframes fxAurora {
+  0%   { transform: translate3d(0, 0, 0)     scale(1); }
+  50%  { transform: translate3d(2%, -2%, 0)  scale(1.06); }
+  100% { transform: translate3d(-2%, 2%, 0)  scale(1.02); }
+}
+
+/* ── Lebegő levelek (passzív, uiFx.js tölti fel) ── */
+.fx-particles {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  overflow: hidden;
+}
+.fx-leaf {
+  position: absolute; bottom: -40px;
+  opacity: 0;
+  animation: fxRise linear infinite;
+  will-change: transform, opacity;
+}
+@keyframes fxRise {
+  0%   { transform: translateY(0) rotate(0deg) translateX(0); opacity: 0; }
+  10%  { opacity: .16; }
+  55%  { transform: translateY(-55vh) rotate(160deg) translateX(-24px); }
+  90%  { opacity: .1; }
+  100% { transform: translateY(-112vh) rotate(330deg) translateX(36px); opacity: 0; }
+}
+
+/* ── Belépő animáció (uiFx.js adja a classokat) ── */
+.fx-reveal { opacity: 0; transform: translateY(18px) scale(.985); }
+.fx-reveal.fx-in {
+  opacity: 1; transform: none;
+  transition: opacity .5s ease var(--fx-delay, 0ms),
+              transform .55s var(--spring) var(--fx-delay, 0ms);
+}
+
+/* ── Ripple (érintés-hullám) ─────────────────── */
+.fx-ripple-host { position: relative; overflow: hidden; }
+.fx-ripple {
+  position: absolute; border-radius: 50%;
+  pointer-events: none;
+  background: currentColor;
+  opacity: .22; transform: scale(0);
+  animation: fxRipple .55s ease-out forwards;
+}
+@keyframes fxRipple { to { transform: scale(2.6); opacity: 0; } }
+
+/* ── Glassmorphism fejléc + alsó nav ─────────── */
+.app-header {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: blur(18px) saturate(1.5);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, .05);
+}
+.bottom-nav {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: blur(18px) saturate(1.5);
+  border-top: 1px solid var(--glass-border);
+}
+
+/* ── Logó: finom ringás (passzív) ────────────── */
+.header-logo .logo-icon { animation: fxSway 6s ease-in-out infinite; }
+@keyframes fxSway {
+  0%, 100% { transform: rotate(-4deg); }
+  50%      { transform: rotate(4deg); }
+}
+
+/* ── Témaváltó / ikon gombok mikrointerakció ─── */
+.icon-btn svg { transition: transform .35s var(--spring); }
+.icon-btn:hover svg { transform: rotate(18deg) scale(1.1); }
+
+/* ── Alsó nav: Material You pill + ikon-pop ──── */
+.nav-item { isolation: isolate; }
+.nav-item.active::before { display: none; }   /* régi felső csík ki */
+.nav-item::after {
+  content: '';
+  position: absolute; z-index: -1;
+  top: 8px; left: 50%;
+  width: 52px; height: 28px; border-radius: 14px;
+  background: var(--accent-bg);
+  transform: translateX(-50%) scale(.4);
+  opacity: 0;
+  transition: transform .4s var(--spring), opacity .25s ease;
+}
+.nav-item.active::after { transform: translateX(-50%) scale(1); opacity: 1; }
+.nav-item svg { transition: transform .3s var(--spring); }
+.nav-item.active svg { animation: fxPop .45s var(--spring); }
+@keyframes fxPop {
+  0%   { transform: scale(.7); }
+  60%  { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+/* ── FAB: pulzáló gyűrű + forgó plusz ────────── */
+.nav-fab-btn::after {
+  content: '';
+  position: absolute;
+  width: 52px; height: 52px; border-radius: 50%;
+  top: 50%; transform: translateY(-55%);
+  pointer-events: none;
+  animation: fxFabPulse 2.8s ease-out infinite;
+}
+@keyframes fxFabPulse {
+  0%   { box-shadow: 0 0 0 0 var(--accent-ring); }
+  70%  { box-shadow: 0 0 0 14px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.nav-fab-btn svg { transition: transform .45s var(--spring); }
+.nav-fab-btn:hover svg { transform: translateY(-3px) rotate(90deg); }
+
+/* ── Kártyák: lift + zöld glow + élénk keret ─── */
+.card, .stat-card, .log-item, .allergen-list-item,
+.chart-wrap, .knowledge-card, .settings-group {
+  transition: transform .3s var(--spring), box-shadow .3s ease,
+              border-color .3s ease, background var(--t-slow);
+}
+.card:hover, .chart-wrap:hover, .knowledge-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--glow);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+.stat-card:hover {
+  transform: translateY(-4px) scale(1.03);
+  box-shadow: var(--glow);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+.stat-card:hover .stat-icon { animation: fxWiggle .5s ease; }
+@keyframes fxWiggle {
+  0%, 100% { transform: rotate(0); }
+  25%      { transform: rotate(-12deg) scale(1.18); }
+  75%      { transform: rotate(10deg)  scale(1.1); }
+}
+.log-item:hover {
+  transform: translateX(4px);
+  box-shadow: var(--glow);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+.allergen-chip { transition: all .3s var(--spring); }
+.allergen-chip:hover { transform: translateY(-4px) scale(1.04); box-shadow: var(--glow); }
+
+/* ── Üdvözlőkártya: élő gradient + úszó buborékok ── */
+.greeting-card {
+  background: linear-gradient(120deg, var(--accent), var(--accent-light), #AED581, var(--accent-light), var(--accent));
+  background-size: 300% 300%;
+  animation: fxGradient 16s ease infinite;
+  box-shadow: var(--glow);
+  will-change: transform;
+}
+@keyframes fxGradient {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+.greeting-card::before { animation: fxBlob 9s ease-in-out infinite alternate; }
+.greeting-card::after  { animation: fxBlob 13s ease-in-out infinite alternate-reverse; }
+@keyframes fxBlob {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-14px, 10px) scale(1.2); }
+}
+.greeting-card .greeting-emoji { animation: fxEmojiFloat 4s ease-in-out infinite; }
+@keyframes fxEmojiFloat {
+  0%, 100% { transform: translateY(-50%); }
+  50%      { transform: translateY(calc(-50% - 8px)) rotate(6deg); }
+}
+
+/* ── Gombok: fény-sweep + rugós nyomás ───────── */
+.btn { position: relative; overflow: hidden; }
+.btn-primary::after {
+  content: '';
+  position: absolute; top: 0; left: -80%;
+  width: 50%; height: 100%;
+  background: linear-gradient(105deg, transparent, rgba(255,255,255,.35), transparent);
+  transform: skewX(-20deg);
+  transition: left .6s ease;
+  pointer-events: none;
+}
+.btn-primary:hover::after { left: 140%; }
+.btn:active { transform: scale(.96); }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 18px var(--accent-ring); }
+
+/* ── Tünet / környezet gombok: rugós kiválasztás ── */
+.symptom-btn, .env-btn, .trigger-chip, .chip-selectable, .pill-tab {
+  transition: all .28s var(--spring);
+}
+.symptom-btn:hover { transform: translateY(-3px); box-shadow: var(--shadow-sm); }
+.symptom-btn.selected { animation: fxPop .4s var(--spring); box-shadow: 0 4px 14px var(--accent-ring); }
+.trigger-chip.selected, .chip-selectable.selected { animation: fxPop .35s var(--spring); }
+.symptom-btn .sym-icon { transition: transform .3s var(--spring); }
+.symptom-btn:hover .sym-icon { transform: scale(1.2) rotate(-6deg); }
+
+/* ── Form fókusz: finom emelés ───────────────── */
+.form-control { transition: border-color var(--t-fast), box-shadow var(--t-fast), transform .2s ease; }
+.form-control:focus { transform: translateY(-1px); }
+
+/* ── Toggle: rugós csúszka ───────────────────── */
+.toggle-thumb { transition: transform .35s var(--spring); }
+.toggle input:checked + .toggle-track { box-shadow: inset 0 0 6px rgba(0,0,0,.12); }
+
+/* ── Csúszka hüvelyk: rugós ──────────────────── */
+input[type=range]::-webkit-slider-thumb { transition: transform .25s var(--spring), box-shadow .25s ease; }
+input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.3); box-shadow: 0 0 0 6px var(--accent-ring); }
+
+/* ── Szekciócímek: gradient jelölősáv ────────── */
+.section-title {
+  position: relative;
+  padding-left: 11px;
+}
+.section-title::before {
+  content: '';
+  position: absolute; left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 4px; height: 72%;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-light));
+}
+
+/* ── Drawer: lépcsőzetes belépés ─────────────── */
+.drawer.open .drawer-nav > * {
+  animation: fxSlideIn .45s var(--spring) both;
+}
+@keyframes fxSlideIn {
+  from { opacity: 0; transform: translateX(-18px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.drawer.open .drawer-nav > *:nth-child(1)  { animation-delay: .02s; }
+.drawer.open .drawer-nav > *:nth-child(2)  { animation-delay: .05s; }
+.drawer.open .drawer-nav > *:nth-child(3)  { animation-delay: .08s; }
+.drawer.open .drawer-nav > *:nth-child(4)  { animation-delay: .11s; }
+.drawer.open .drawer-nav > *:nth-child(5)  { animation-delay: .14s; }
+.drawer.open .drawer-nav > *:nth-child(6)  { animation-delay: .17s; }
+.drawer.open .drawer-nav > *:nth-child(7)  { animation-delay: .20s; }
+.drawer.open .drawer-nav > *:nth-child(8)  { animation-delay: .23s; }
+.drawer.open .drawer-nav > *:nth-child(9)  { animation-delay: .26s; }
+.drawer.open .drawer-nav > *:nth-child(10) { animation-delay: .29s; }
+.drawer-item { transition: background var(--t-fast), color var(--t-fast), transform .25s var(--spring); }
+.drawer-item:hover { transform: translateX(4px); }
+.drawer-item svg { transition: transform .3s var(--spring); }
+.drawer-item:hover svg { transform: scale(1.15); }
+
+/* ── Modal / toast: rugós érkezés ────────────── */
+#modal-content { animation: sheetIn .45s var(--spring); }
+.toast { animation: toastIn .45s var(--spring), toastOut .3s ease 2.7s forwards; }
+
+/* ── Progress bar: futó fény (passzív) ───────── */
+.progress-bar { position: relative; overflow: hidden; }
+.progress-bar::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent);
+  animation: fxBarSheen 1.8s ease infinite;
+}
+@keyframes fxBarSheen {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+/* ── Üres állapot ikon: lebegés (passzív) ────── */
+.empty-state .empty-icon { display: inline-block; animation: fxBob 3.5s ease-in-out infinite; }
+@keyframes fxBob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+
+/* ── Táblázat sorok ──────────────────────────── */
+.pollen-table td { transition: background .2s ease; }
+
+/* ── Scrollbar: zöld gradient ────────────────── */
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--green-300), var(--green-500));
+  border-radius: 3px;
+}
+
+/* ── Settings item: ikon mikrointerakció ─────── */
+.settings-item-icon { transition: transform .3s var(--spring); }
+.settings-item:hover .settings-item-icon { transform: scale(1.12) rotate(-5deg); }
+.settings-item-arrow { transition: transform .25s ease; }
+.settings-item:hover .settings-item-arrow { transform: translateX(3px); }
+
+/* ── Naptár napok: rugós hover ───────────────── */
+.cal-day { transition: transform .25s var(--spring), box-shadow .2s ease; }
+.cal-day:not(.empty):hover { transform: scale(1.18); box-shadow: var(--shadow-md); z-index: 1; }
+
+/* ── Csökkentett mozgás: minden animáció ki ──── */
+@media (prefers-reduced-motion: reduce) {
+  body::before, .fx-particles { display: none; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  .fx-reveal { opacity: 1; transform: none; }
+}
+

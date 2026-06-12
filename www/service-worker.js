@@ -3,7 +3,7 @@
    Cache-first stratégia statikus erőforrásokhoz
    ═══════════════════════════════════════════════ */
 
-const CACHE = 'allergytrack-v1.6.0';
+const CACHE = 'allergytrack-v1.7.0';
 
 const STATIC = [
   './',
@@ -26,6 +26,7 @@ const STATIC = [
   './js/profile.js',
   './js/settings.js',
   './js/sync.js',
+  './js/uiFx.js',
   './js/supabase.js',
   './js/auth.js',
   './js/userProfile.js',
