@@ -3,7 +3,7 @@
    Cache-first stratégia statikus erőforrásokhoz
    ═══════════════════════════════════════════════ */
 
-const CACHE = 'allergytrack-v1.9.0';
+const CACHE = 'allergytrack-v1.9.1';
 
 const STATIC = [
   './',

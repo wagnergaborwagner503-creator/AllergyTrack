@@ -54,7 +54,8 @@ App.Analytics = {
 
       <!-- Most likely allergens -->
       <div class="card mb-4">
-        <div class="card-title mb-3">🔍 Ismétlődő pollen–tünet mintázatok</div>
+        <div class="card-title mb-1">🔍 Ismétlődő pollen–tünet mintázatok</div>
+        <div class="text-muted mb-3" style="font-size:11px">Mindig az összes rögzített adat alapján – az időszak-választó nem befolyásolja</div>
         <div id="likely-allergens-list"></div>
       </div>
 
@@ -118,7 +119,9 @@ App.Analytics = {
     this._renderSymptomChart(logs);
     this._renderCorrelationChart(logs, pollenAll);
     this._renderForecastChart(pollenForecast);
-    this._renderLikelyAllergens(logs, pollenAll);
+    /* Ismétlődő pollen–tünet mintázatok: MINDIG az összes (all-time) adatot
+       nézi – az időszak-választó NEM befolyásolja. */
+    this._renderLikelyAllergens(this._allLogs, this._allPollenData);
     this._renderInsights(logs, pollenAll);
   },
 
