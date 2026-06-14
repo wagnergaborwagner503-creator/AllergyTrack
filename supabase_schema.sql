@@ -4,7 +4,7 @@
 -- ═══════════════════════════════════════════════════════════
 
 -- ── profiles tábla ──────────────────────────────────────────
-create table public.profiles (
+create table if not exists public.profiles (
   id              uuid references auth.users on delete cascade primary key,
   display_name    text,
   avatar_url      text,
@@ -19,16 +19,19 @@ create table public.profiles (
 alter table public.profiles enable row level security;
 
 -- Csak saját profil olvasható
+drop policy if exists "Own profile select" on public.profiles;
 create policy "Own profile select"
   on public.profiles for select
   using (auth.uid() = id);
 
 -- Csak saját profil frissíthető
+drop policy if exists "Own profile update" on public.profiles;
 create policy "Own profile update"
   on public.profiles for update
   using (auth.uid() = id);
 
 -- Csak saját profil szúrható be
+drop policy if exists "Own profile insert" on public.profiles;
 create policy "Own profile insert"
   on public.profiles for insert
   with check (auth.uid() = id);
@@ -52,6 +55,7 @@ begin
 end;
 $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
@@ -65,6 +69,7 @@ begin
 end;
 $$;
 
+drop trigger if exists profiles_updated_at on public.profiles;
 create trigger profiles_updated_at
   before update on public.profiles
   for each row execute function public.set_updated_at();
