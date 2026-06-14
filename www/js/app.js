@@ -404,6 +404,10 @@ App.init = async function () {
     /* Pull-to-refresh */
     App._initPullToRefresh();
 
+    /* App újranyitás (háttérből előtérbe) → publikus pollen + adatfrissítés */
+    App._lastVisibilityRefresh = Date.now();   /* a cold-start pull után indul a throttle */
+    App._initVisibilityRefresh();
+
   } catch (err) {
     console.error('App init error:', err);
     const loading = document.getElementById('loading-screen');
@@ -528,6 +532,37 @@ App._updateHeaderLocation = function (loc) {
   }
 };
 
+/* ── Adatfrissítés: megosztott pollen + személyes felhőadatok ──────────────
+   Pull-to-refresh ÉS app-újranyitás (visibilitychange) hívja.
+   • Publikus (admin által feltöltött) pollenadatok – minden fiók letölti.
+   • Személyes adatok (tünetnapló, profil) – csak ha be van jelentkezve. */
+App._refreshData = async function () {
+  const tasks = [];
+  if (App.PollenFetcher) tasks.push(App.PollenFetcher.syncShared().catch(() => {}));
+  if (App.Auth?.isLoggedIn && App.CloudSync) {
+    tasks.push(App.CloudSync.pullAll().catch(() => {}));
+  }
+  try { await Promise.all(tasks); } catch (_) {}
+};
+
+/* ── App újranyitás (háttérből előtérbe) – adatfrissítés ───────────────────
+   A "visibilitychange" akkor is lefut, ha az app nem indul újra, csak a
+   háttérből tér vissza (PWA / Capacitor). Throttle: max. percenként egyszer,
+   hogy a gyakori váltogatás ne terhelje a hálózatot. */
+App._lastVisibilityRefresh = 0;
+App._initVisibilityRefresh = function () {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    const now = Date.now();
+    if (now - App._lastVisibilityRefresh < 60000) return;   /* 60 mp throttle */
+    App._lastVisibilityRefresh = now;
+    App._refreshData().then(() => {
+      const page = App._currentPage;
+      if (page === 'dashboard' || page === 'pollen') App.navigate(page).catch(() => {});
+    });
+  });
+};
+
 /* ── Pull-to-refresh ────────────────────────── */
 App._initPullToRefresh = function () {
   const content = document.getElementById('page-content');
@@ -592,6 +627,8 @@ App._initPullToRefresh = function () {
       if (App.GeoLocation) {
         App.GeoLocation.refresh().then(loc => App._updateHeaderLocation(loc));
       }
+      /* Publikus pollenadatok + személyes felhőadatok frissítése */
+      await App._refreshData();
       await App.navigate(App._currentPage || 'dashboard');
       setTimeout(hidePull, 500);
     }

@@ -14,6 +14,30 @@ window.App = window.App || {};
 
 App.PollenFetcher = {
 
+  /* ── Admin: kollektív (publikus) pollen feltöltő fiók ─────────────────────
+     CSAK ez a fiók tölthet fel megosztott pollenadatot a szerverre.
+     Minden más fiók kizárólag LETÖLTI a publikus adatokat (pullFromSupabase). */
+  ADMIN_EMAIL: 'wagnergaborwagner503@gmail.com',
+
+  /* Gmail-normalizálás: a pontok és a "+címke" elhagyása, kisbetűsítés –
+     így a "wagnergaborwagner.503@gmail.com" és a pont nélküli alak is egyezik. */
+  _normalizeEmail(email) {
+    if (!email) return '';
+    let [local, domain] = String(email).toLowerCase().trim().split('@');
+    if (!domain) return local || '';
+    if (domain === 'gmail.com' || domain === 'googlemail.com') {
+      local  = local.split('+')[0].replace(/\./g, '');
+      domain = 'gmail.com';
+    }
+    return `${local}@${domain}`;
+  },
+
+  /* Igaz, ha a bejelentkezett fiók az admin (a kollektív pollen feltöltője). */
+  isAdmin() {
+    const email = App.Auth?.email;
+    return !!email && this._normalizeEmail(email) === this._normalizeEmail(this.ADMIN_EMAIL);
+  },
+
   /* ── Hungarian monitoring cities ─────────── */
   CITIES: [
     { name: 'Budapest',        lat: 47.50, lon: 19.08 },
@@ -404,7 +428,7 @@ App.PollenFetcher = {
     try {
       const result = await this.fetchLatest();
       if (result?.entries?.length) {
-        /* Push a megosztott táblába – ha be van jelentkezve */
+        /* Push a megosztott táblába – csak admin fióknál fut le ténylegesen */
         this.pushToSupabase(result.entries).catch(() => {});
       }
       return result;
@@ -414,12 +438,36 @@ App.PollenFetcher = {
     }
   },
 
+  /* ── Megosztott pollen szinkron (app újranyitás / pull-to-refresh) ────────
+     • Admin fiók: friss adatok letöltése a forrásokból + feltöltés a
+       megosztott (publikus) szerver-táblába.
+     • MINDEN fiók: a publikus pollenadatok letöltése a szerverről és
+       hozzáadása a helyi adatbázishoz.
+     Visszaadja a letöltött publikus sorok számát.                            */
+  async syncShared() {
+    try {
+      /* Admin: friss adat a forrásokból + push a megosztott táblába.
+         (Nem blokkolja a letöltést, ha a fetch hibázik.) */
+      if (this.isAdmin()) {
+        await this.fetchAll().catch(() => {});
+      }
+      /* Mindenki: publikus pollenadatok letöltése */
+      return await this.pullFromSupabase();
+    } catch (e) {
+      console.warn('[PollenSync] syncShared hiba:', e.message ?? e);
+      return 0;
+    }
+  },
+
   /* ── Supabase megosztott pollenadatok: feltöltés ─────────────────────────
      Ha be van jelentkezve a felhasználó, az éppen mentett pollenadatokat
      feltölti a shared_pollen_data táblába – így minden user látja.          */
   async pushToSupabase(entries) {
     const sb = App.Supabase?.get?.();
     if (!sb || !App.Auth?.isLoggedIn) return;
+    /* Csak az admin fiók tölthet fel megosztott pollenadatot – minden más
+       fiók kizárólag letölti a publikus adatokat (pullFromSupabase). */
+    if (!this.isAdmin()) return;
     if (!entries?.length) return;
 
     try {

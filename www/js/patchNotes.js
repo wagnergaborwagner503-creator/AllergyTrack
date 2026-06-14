@@ -7,10 +7,21 @@ window.App = window.App || {};
 
 App.PatchNotes = {
 
-  CURRENT_VERSION: '1.5.0',
+  CURRENT_VERSION: '1.6.0',
 
   /* Verzió-lista (legújabb elöl) */
   NOTES: [
+    {
+      version: '1.6.0',
+      date: '2026-06-14',
+      title: 'Kollektív pollenadatok + kontrasztos kijelölés',
+      summary: 'A pollenadatok mostantól közösek: egy központi fiók tölti fel őket a szerverre, és minden felhasználó automatikusan letölti azokat az app újranyitásakor és lefelé húzáskor. Az új bejegyzésnél a kiválasztott tünetek, környezet és kiváltó tényezők sokkal egyértelműbbek lettek.',
+      changes: [
+        { type: 'new', text: 'Kollektív pollen: a megosztott (publikus) pollenadatok minden fióknál automatikusan frissülnek app-újranyitáskor és lefelé húzáskor (pull-to-refresh)' },
+        { type: 'new', text: 'A megosztott pollenadatokat egyetlen központi fiók tölti fel – így mindenkinél egységes, megbízható adat jelenik meg' },
+        { type: 'fix', text: 'Kijelölt tünet / környezet / kiváltó tényező gombok: telt zöld háttér, kontrasztos felirat, kiemelő gyűrű és pipa jel – egyértelmű, mi van kiválasztva' },
+      ],
+    },
     {
       version: '1.5.0',
       date: '2026-06-10',
